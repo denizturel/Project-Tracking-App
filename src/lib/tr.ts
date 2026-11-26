@@ -31,6 +31,7 @@ export const TR: Record<string, string> = {
   Messages: 'Mesajlar',
   'No projects yet. Create one from All projects.': 'Henüz proje yok. Tüm projeler ekranından oluşturun.',
   'No projects here yet.': 'Burada henüz proje yok.',
+  'Fields with * are required.': 'Yıldızlı (*) alanlar zorunludur.',
   'Open project': 'Projeyi aç',
   'Yes, I am sure': 'Evet, eminim',
   'More actions': 'Diğer işlemler',

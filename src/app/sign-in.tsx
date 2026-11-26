@@ -14,6 +14,9 @@ const LANGUAGES = [
   { value: 'tr', label: 'Türkçe' },
 ] as const;
 
+/** Google sign-in is switched off in Supabase for now. Set to true once the Google provider is turned on there. */
+const GOOGLE_SIGN_IN: boolean = false;
+
 export default function SignInScreen() {
   const { lang } = usePrefs();
   const { signInWithGoogle } = useAuth();
@@ -87,17 +90,21 @@ export default function SignInScreen() {
       <Card>
         <ThemedText type="subtitle">{creating ? 'Create your account' : 'Sign in'}</ThemedText>
 
-        <Button
-          title="Continue with Google"
-          variant="secondary"
-          onPress={google}
-          loading={busy === 'google'}
-          disabled={busy !== null}
-        />
+        {GOOGLE_SIGN_IN && (
+          <>
+            <Button
+              title="Continue with Google"
+              variant="secondary"
+              onPress={google}
+              loading={busy === 'google'}
+              disabled={busy !== null}
+            />
 
-        <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
-          or use your email
-        </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+              or use your email
+            </ThemedText>
+          </>
+        )}
 
         {creating && (
           <Field
@@ -164,8 +171,9 @@ export default function SignInScreen() {
 
         {creating && (
           <ThemedText type="small" themeColor="textSecondary">
-            Fields with * are required. With Google, you fill in company and position on the next
-            screen.
+            {GOOGLE_SIGN_IN
+              ? 'Fields with * are required. With Google, you fill in company and position on the next screen.'
+              : 'Fields with * are required.'}
           </ThemedText>
         )}
 
