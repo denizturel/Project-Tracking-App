@@ -104,7 +104,7 @@ export function AppLockProvider({ children }: { children: ReactNode }) {
   }, [enabled]);
 
   const unlock = useCallback(async () => {
-    if (await ask('Unlock Workroom')) setLocked(false);
+    if (await ask('Unlock Doneva')) setLocked(false);
   }, []);
 
   const setEnabled = useCallback(

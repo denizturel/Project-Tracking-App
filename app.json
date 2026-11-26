@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Workroom",
+    "name": "Doneva",
     "slug": "Project-Tracking-App",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -37,7 +37,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow Workroom to use Face ID to unlock the app."
+          "faceIDPermission": "Allow Doneva to use Face ID to unlock the app."
         }
       ]
     ],

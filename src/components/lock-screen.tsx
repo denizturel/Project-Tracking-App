@@ -21,7 +21,7 @@ export function LockScreen() {
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.cover, { backgroundColor: theme.background }]}>
-      <ThemedText type="title">Workroom</ThemedText>
+      <ThemedText type="title">Doneva</ThemedText>
       <ThemedText themeColor="textSecondary" style={styles.text}>
         Locked. Use {method} to open the app.
       </ThemedText>

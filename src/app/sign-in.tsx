@@ -66,7 +66,7 @@ export default function SignInScreen() {
   return (
     <Screen centered>
       <View style={{ gap: Spacing.one }}>
-        <ThemedText type="title">Workroom</ThemedText>
+        <ThemedText type="title">Doneva</ThemedText>
         <ThemedText themeColor="textSecondary">
           Projects, chats, tasks and solutions for your team, in one place.
         </ThemedText>
