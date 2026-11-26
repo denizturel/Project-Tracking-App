@@ -133,12 +133,8 @@ function NewItem({ info, onSaved }: { info: SpaceInfo; onSaved: () => void }) {
   if (mode === 'closed') {
     return (
       <View style={styles.row}>
-        <View style={styles.grow}>
-          <Button title="Add a link" onPress={() => setMode('link')} />
-        </View>
-        <View style={styles.grow}>
-          <Button title="Add a document" variant="secondary" onPress={() => setMode('document')} />
-        </View>
+        <Button title="Add a link" icon="link" inline onPress={() => setMode('link')} />
+        <Button title="Add a document" icon="file-text" inline variant="secondary" onPress={() => setMode('document')} />
       </View>
     );
   }
@@ -291,10 +287,10 @@ function ItemCard({ copies, places, here, showPlaces, isAdmin, onChanged }: Card
   }
 
   return (
-    <Card tint={item.kind === 'link' ? 'sky' : 'butter'}>
+    <Card>
       <View style={styles.tags}>
-        <Tag text={item.kind === 'link' ? 'Link' : `Document ${fileSize(item.size_bytes)}`.trim()} />
-        {showPlaces && places.map((place) => <Tag key={place} text={place} />)}
+        <Tag text={item.kind === 'link' ? 'Link' : `Document ${fileSize(item.size_bytes)}`.trim()} tone={item.kind === 'link' ? 'accent' : 'lavender'} />
+        {showPlaces && places.map((place) => <Tag key={place} text={place} tone="sky" />)}
       </View>
 
       {editing ? (
@@ -333,6 +329,5 @@ function ItemCard({ copies, places, here, showPlaces, isAdmin, onChanged }: Card
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexWrap: 'wrap' },
-  grow: { flex: 1, minWidth: 160 },
   tags: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
 });

@@ -82,7 +82,7 @@ function NewMilestone({ info, onSaved }: { info: SpaceInfo; onSaved: () => void 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open) return <Button title="Add to the schedule" onPress={() => setOpen(true)} />;
+  if (!open) return <Button title="Add to the schedule" icon="plus" inline onPress={() => setOpen(true)} />;
 
   async function save() {
     const startDate = start.trim() ? parseDate(start) : null;
@@ -157,7 +157,7 @@ function MilestoneCard({ milestone, place, isAdmin, onChanged }: CardProps) {
   const dates = [formatDate(milestone.start_date), formatDate(milestone.due_date)].filter(Boolean).join(' to ');
 
   return (
-    <Card tint={milestone.done ? 'mint' : 'card'}>
+    <Card>
       {editing ? (
         <>
           <Field label="What happens" required value={title} onChangeText={setTitle} />
@@ -183,8 +183,8 @@ function MilestoneCard({ milestone, place, isAdmin, onChanged }: CardProps) {
             </View>
           </View>
           <View style={styles.row}>
-            {place && <Tag text={place} />}
-            {milestone.done && <Tag text="✓ Done" />}
+            {place && <Tag text={place} tone="sky" />}
+            {milestone.done && <Tag text="✓ Done" tone="ok" />}
           </View>
           <EditedLabel name={milestone.edited_at ? personName(milestone.editor) : null} at={milestone.edited_at} />
           {isAdmin && (
@@ -238,7 +238,7 @@ function Timeline({ items }: { items: Milestone[] }) {
               style={[
                 styles.bar,
                 {
-                  backgroundColor: m.done ? theme.mint : theme.primary,
+                  backgroundColor: m.done ? theme.ok : theme.primary,
                   borderColor: theme.border,
                   marginLeft: `${((from - min) / total) * 100}%`,
                   width: `${Math.max(((to - from) / total) * 100, 3)}%`,

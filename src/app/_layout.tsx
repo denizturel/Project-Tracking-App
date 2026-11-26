@@ -1,3 +1,7 @@
+import { Manrope_500Medium, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
+import { Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
+import Feather from '@expo/vector-icons/Feather';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -26,11 +30,22 @@ function RootNavigator() {
   const theme = useTheme();
   const { locked } = useAppLock();
 
-  useEffect(() => {
-    if (!loading) SplashScreen.hideAsync();
-  }, [loading]);
+  const [fontsReady, fontsFailed] = useFonts({
+    Manrope_500Medium,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    ...Feather.font,
+  });
+  // If the fonts cannot load, carry on with the phone's own font.
+  const waiting = loading || (!fontsReady && !fontsFailed);
 
-  if (loading) return null;
+  useEffect(() => {
+    if (!waiting) SplashScreen.hideAsync();
+  }, [waiting]);
+
+  if (waiting) return null;
 
   const signedIn = !!session;
   // Company and position are required before anyone can continue (decided by Deniz).
@@ -58,7 +73,7 @@ function Screens({
       screenOptions={{
         headerStyle: { backgroundColor: theme.backgroundElement },
         headerTintColor: theme.text,
-        headerTitleStyle: { fontSize: 20, fontWeight: 700 },
+        headerTitleStyle: { fontSize: 20, fontFamily: 'Sora_600SemiBold' },
         contentStyle: { backgroundColor: theme.background },
       }}
     >

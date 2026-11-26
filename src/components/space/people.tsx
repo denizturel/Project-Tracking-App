@@ -3,7 +3,7 @@ import { ActivityIndicator, Switch, View } from 'react-native';
 
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, ErrorText, Field, TextButton } from '@/components/ui';
+import { Avatar, Button, Card, Chip, ErrorText, Field, TextButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -105,16 +105,25 @@ export function People({ info }: { info: SpaceInfo }) {
         const role = roleOf.get(person.user_id);
         const ownAdmin = !!subgroup && person.role === 'admin';
         return (
-          <Card key={person.user_id} style={{ gap: Spacing.one }}>
-            <ThemedText type="bold">
-              {person.profile?.full_name ?? 'Unknown'}
-              {person.user_id === me ? ' (you)' : ''}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {[person.profile?.position, person.profile?.company_name].filter(Boolean).join(' at ')}
-              {role === 'admin' ? ' · Project admin' : ''}
-              {ownAdmin ? ` · Admin of this ${level}` : ''}
-            </ThemedText>
+          <Card key={person.user_id} style={{ gap: Spacing.two }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Avatar name={person.profile?.full_name} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <ThemedText type="bold">
+                  {person.profile?.full_name ?? 'Unknown'}
+                  {person.user_id === me ? ' (you)' : ''}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {[person.profile?.position, person.profile?.company_name].filter(Boolean).join(' at ')}
+                </ThemedText>
+              </View>
+            </View>
+            {(role === 'admin' || ownAdmin) && (
+              <View style={{ flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' }}>
+                {role === 'admin' && <Chip text="Project admin" tone="accent" />}
+                {ownAdmin && <Chip text={`Admin of this ${level}`} tone="lavender" />}
+              </View>
+            )}
             {isAdmin && (
               <View style={{ flexDirection: 'row', gap: Spacing.four, flexWrap: 'wrap' }}>
                 {!subgroup && person.user_id !== me && (

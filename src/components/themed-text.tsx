@@ -1,26 +1,29 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { ThemeColor } from '@/constants/theme';
+import { type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'bold' | 'title' | 'subtitle' | 'small' | 'smallBold' | 'link';
+  type?: 'default' | 'bold' | 'title' | 'subtitle' | 'heading' | 'small' | 'smallBold' | 'link' | 'label' | 'number';
   themeColor?: ThemeColor;
 };
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
-  const color = theme[themeColor ?? (type === 'link' ? 'primary' : 'text')];
+  const color = theme[themeColor ?? (type === 'link' ? 'primary' : type === 'label' ? 'textSecondary' : 'text')];
 
   return <Text style={[{ color }, styles[type], style]} {...rest} />;
 }
 
 const styles = StyleSheet.create({
-  default: { fontSize: 17, lineHeight: 25 },
-  bold: { fontSize: 17, lineHeight: 25, fontWeight: 700 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: 700 },
-  subtitle: { fontSize: 22, lineHeight: 28, fontWeight: 700 },
-  small: { fontSize: 15, lineHeight: 21 },
-  smallBold: { fontSize: 15, lineHeight: 21, fontWeight: 700 },
-  link: { fontSize: 17, lineHeight: 25, fontWeight: 600 },
+  default: { fontFamily: Type.body, fontSize: 17, lineHeight: 25 },
+  bold: { fontFamily: Type.bodyBold, fontSize: 17, lineHeight: 25 },
+  title: { fontFamily: Type.headBold, fontSize: 30, lineHeight: 37, letterSpacing: -0.3 },
+  subtitle: { fontFamily: Type.head, fontSize: 21, lineHeight: 28, letterSpacing: -0.2 },
+  heading: { fontFamily: Type.head, fontSize: 18, lineHeight: 25, letterSpacing: -0.2 },
+  small: { fontFamily: Type.body, fontSize: 15, lineHeight: 21 },
+  smallBold: { fontFamily: Type.bodyBold, fontSize: 15, lineHeight: 21 },
+  link: { fontFamily: Type.bodyBold, fontSize: 17, lineHeight: 25 },
+  label: { fontFamily: Type.bodyBold, fontSize: 13, lineHeight: 18, letterSpacing: 0.9, textTransform: 'uppercase' },
+  number: { fontFamily: Type.headBold, fontSize: 34, lineHeight: 40, letterSpacing: -0.5 },
 });

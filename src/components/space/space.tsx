@@ -1,6 +1,6 @@
-import { Link, Stack } from 'expo-router';
+import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Chat } from '@/components/space/chat';
 import { Overview } from '@/components/space/overview';
@@ -11,9 +11,9 @@ import { Tasks } from '@/components/space/tasks';
 import { Training } from '@/components/space/training';
 import { ThemedText } from '@/components/themed-text';
 import { ComingNext, ErrorText } from '@/components/ui';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { type ProjectNode, type SubgroupNode, useWorkspace } from '@/lib/workspace';
+import { type ProjectNode, type SubgroupNode, useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 
 /** What a tab needs to know about where it is. */
 export type SpaceInfo = {
@@ -27,6 +27,8 @@ export type SpaceInfo = {
   isAdmin: boolean;
   /** Admin of the whole project (includes company owners and admins). */
   isProjectAdmin: boolean;
+  /** Simple layout: a team, or a group in a project that has no teams. */
+  simple: boolean;
 };
 
 const FULL_TABS = ['Overview', 'Chat', 'Tasks', 'Schedule', 'Questions & solutions', 'Training', 'Media, links, docs', 'People'];
@@ -36,8 +38,13 @@ const TEAM_CHAT_TABS = ['Messages', 'Media, links, docs', 'People', 'Schedule'];
 
 export function Space(props: { projectId: string } | { subgroupId: string }) {
   const theme = useTheme();
-  const { projects, subgroups, adminSubgroups, loading, error } = useWorkspace();
-  const [tab, setTab] = useState('Overview');
+  const { companies, projects, subgroups, adminSubgroups, loading, error } = useWorkspace();
+  const router = useRouter();
+  const wide = useWindowDimensions().width >= WIDE_SCREEN;
+  // The open section is part of the address, so the side menu can link straight to it.
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const tab = typeof params.tab === 'string' ? params.tab : 'Overview';
+  const setTab = (next: string) => router.setParams({ tab: next });
   const [chatTab, setChatTab] = useState('Messages');
 
   const subgroup = 'subgroupId' in props ? (subgroups.find((s) => s.id === props.subgroupId) ?? null) : null;
@@ -61,8 +68,13 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
   }
 
   const parent = subgroup?.parent_id ? (subgroups.find((s) => s.id === subgroup.parent_id) ?? null) : null;
+  const level = !subgroup ? 'project' : subgroup.parent_id ? 'team' : 'group';
+  // A project that has groups but no teams anywhere (for example one single hotel
+  // and its departments) uses the simple layout for its groups (decided by Deniz).
+  const projectHasTeams = subgroups.some((s) => s.project_id === project.id && s.parent_id);
+  const simple = level === 'team' || (level === 'group' && !projectHasTeams);
   const info: SpaceInfo = {
-    level: !subgroup ? 'project' : subgroup.parent_id ? 'team' : 'group',
+    level,
     project,
     subgroup,
     parent,
@@ -70,12 +82,9 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
       project.myRole === 'admin' ||
       (!!subgroup && (adminSubgroups.includes(subgroup.id) || adminSubgroups.includes(subgroup.parent_id ?? ''))),
     isProjectAdmin: project.myRole === 'admin',
+    simple,
   };
   const name = subgroup?.name ?? project.name;
-  // A project that has groups but no teams anywhere (for example one single hotel
-  // and its departments) uses the simple layout for its groups (decided by Deniz).
-  const projectHasTeams = subgroups.some((s) => s.project_id === project.id && s.parent_id);
-  const simple = info.level === 'team' || (info.level === 'group' && !projectHasTeams);
   const tabs = simple ? TEAM_TABS : FULL_TABS;
   const shownTab = tabs.includes(tab) ? tab : 'Overview';
   const inner = shownTab === 'Chat' && simple ? chatTab : shownTab === 'Chat' ? 'Messages' : shownTab;
@@ -84,12 +93,23 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <Stack.Screen options={{ title: name }} />
 
-      <View style={styles.top}>
+      <View style={[styles.top, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <View style={styles.crumbs}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {companies.find((c) => c.id === project.company_id)?.name ?? 'Projects'}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            ›
+          </ThemedText>
           <Crumb label={project.name} href={{ pathname: '/project/[id]', params: { id: project.id } }} last={!subgroup} />
           {parent && <Crumb label={parent.name} href={{ pathname: '/group/[id]', params: { id: parent.id } }} />}
           {subgroup && <Crumb label={subgroup.name} last />}
         </View>
+        {wide && (
+          <ThemedText type="subtitle" style={styles.title} numberOfLines={2}>
+            {name}
+          </ThemedText>
+        )}
         <TabBar tabs={tabs} value={shownTab} onChange={setTab} />
         {shownTab === 'Chat' && simple && (
           <TabBar tabs={TEAM_CHAT_TABS} value={chatTab} onChange={setChatTab} small />
@@ -100,7 +120,7 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
         <Chat info={info} />
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.column}>
+          <View style={[styles.column, inner === 'Overview' && wide && { maxWidth: WideContentWidth }]}>
             {inner === 'Overview' && <Overview info={info} />}
             {inner === 'People' && <People info={info} />}
             {inner === 'Tasks' && <Tasks info={info} />}
@@ -120,20 +140,33 @@ function Crumb(props: { label: string; href?: React.ComponentProps<typeof Link>[
     <View style={styles.crumb}>
       {props.href && !props.last ? (
         <Link href={props.href}>
-          <ThemedText type="link">{props.label}</ThemedText>
+          <ThemedText type="smallBold" themeColor="primary">
+            {props.label}
+          </ThemedText>
         </Link>
       ) : (
-        <ThemedText type="bold">{props.label}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {props.label}
+        </ThemedText>
       )}
-      {!props.last && <ThemedText themeColor="textSecondary">›</ThemedText>}
+      {!props.last && (
+        <ThemedText type="small" themeColor="textSecondary">
+          ›
+        </ThemedText>
+      )}
     </View>
   );
 }
 
+/** Underlined tabs, as in the prototype. */
 function TabBar(props: { tabs: string[]; value: string; onChange: (tab: string) => void; small?: boolean }) {
   const theme = useTheme();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.tabScroll}
+      contentContainerStyle={styles.tabs}>
       {props.tabs.map((tab) => {
         const active = tab === props.value;
         return (
@@ -145,9 +178,9 @@ function TabBar(props: { tabs: string[]; value: string; onChange: (tab: string) 
             style={[
               styles.tab,
               props.small && styles.tabSmall,
-              { backgroundColor: active ? theme.primary : theme.backgroundElement },
+              { borderBottomColor: active ? theme.primary : 'transparent' },
             ]}>
-            <ThemedText type={props.small ? 'smallBold' : 'bold'} style={{ color: active ? theme.onPrimary : theme.text }}>
+            <ThemedText type={props.small ? 'smallBold' : 'bold'} themeColor={active ? 'text' : 'textSecondary'}>
               {tab}
             </ThemedText>
           </Pressable>
@@ -159,12 +192,14 @@ function TabBar(props: { tabs: string[]; value: string; onChange: (tab: string) 
 
 const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
-  top: { paddingTop: Spacing.three, gap: Spacing.two },
-  crumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, paddingHorizontal: Spacing.three },
-  crumb: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  tabs: { gap: Spacing.two, paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
-  tab: { paddingVertical: Spacing.two, paddingHorizontal: Spacing.three, borderRadius: 999 },
-  tabSmall: { paddingVertical: Spacing.one },
+  top: { paddingTop: 12, borderBottomWidth: 1 },
+  crumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: Spacing.three },
+  crumb: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  title: { paddingHorizontal: Spacing.three, marginTop: 2 },
+  tabScroll: { flexGrow: 0 },
+  tabs: { gap: 4, paddingHorizontal: 10 },
+  tab: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 3 },
+  tabSmall: { paddingVertical: 8 },
   scroll: { padding: Spacing.three, alignItems: 'center' },
-  column: { width: '100%', maxWidth: MaxContentWidth, gap: Spacing.three },
+  column: { width: '100%', maxWidth: MaxContentWidth, gap: 18 },
 });

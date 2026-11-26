@@ -80,7 +80,14 @@ function CompanyPeople({ company }: { company: CompanyNode }) {
   );
 
   if (!open) {
-    return <Button title={`People and admins of ${company.name}`} variant="plain" onPress={() => setOpen(true)} />;
+    return (
+      <Button
+        title={`People and admins of ${company.name}`}
+        icon="users"
+        variant="secondary"
+        onPress={() => setOpen(true)}
+      />
+    );
   }
 
   async function setRole(userId: string, role: 'admin' | 'member') {
@@ -128,6 +135,7 @@ function CompanyPeople({ company }: { company: CompanyNode }) {
 function NewProject({ companyId, companyName }: { companyId: string; companyName: string }) {
   const router = useRouter();
   const { reload } = useWorkspace();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
@@ -153,6 +161,17 @@ function NewProject({ companyId, companyName }: { companyId: string; companyName
     router.push({ pathname: '/project/[id]', params: { id: data.id } });
   }
 
+  if (!open) {
+    return (
+      <Button
+        title={`New project in ${companyName}`}
+        icon="plus"
+        variant="secondary"
+        onPress={() => setOpen(true)}
+      />
+    );
+  }
+
   return (
     <Card>
       <View style={{ gap: Spacing.half }}>
@@ -165,6 +184,7 @@ function NewProject({ companyId, companyName }: { companyId: string; companyName
       <Field label="Description" value={description} onChangeText={setDescription} multiline />
       <ErrorText>{error}</ErrorText>
       <Button title="Create project" onPress={create} loading={busy} disabled={!name.trim()} />
+      <Button title="Cancel" variant="plain" onPress={() => setOpen(false)} disabled={busy} />
     </Card>
   );
 }
@@ -225,7 +245,9 @@ function NewCompany({ first }: { first: boolean }) {
   }
 
   if (!open && !first) {
-    return <Button title="Create another company space" variant="plain" onPress={() => setOpen(true)} />;
+    return (
+      <Button title="Create another company space" icon="briefcase" variant="secondary" onPress={() => setOpen(true)} />
+    );
   }
 
   return (

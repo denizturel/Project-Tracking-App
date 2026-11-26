@@ -11,8 +11,8 @@ import {
 
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Button, EditedLabel, ErrorText, TextButton } from '@/components/ui';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Avatar, Button, EditedLabel, ErrorText, TextButton } from '@/components/ui';
+import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -156,38 +156,48 @@ export function Chat({ info }: { info: SpaceInfo }) {
           const mine = item.sender_id === userId;
           const deleted = !!item.deleted_at;
           return (
-            <View style={[styles.row, { alignItems: mine ? 'flex-end' : 'flex-start' }]}>
+            <View style={[styles.row, mine && styles.rowMine]}>
+              {!mine && <Avatar name={item.sender?.full_name} size={36} />}
               <View
                 style={[
                   styles.bubble,
-                  { backgroundColor: mine ? theme.backgroundSelected : theme.card, borderColor: theme.border },
+                  mine
+                    ? { backgroundColor: theme.bubbleMe, borderColor: 'transparent' }
+                    : { backgroundColor: theme.card, borderColor: theme.border },
                 ]}>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  {mine ? 'You' : (item.sender?.full_name ?? 'Someone')} · {time(item.created_at)}
-                </ThemedText>
+                {!mine && (
+                  <ThemedText type="smallBold" themeColor="primary">
+                    {item.sender?.full_name ?? 'Someone'}
+                  </ThemedText>
+                )}
                 <ThemedText themeColor={deleted ? 'textSecondary' : 'text'} style={deleted && styles.deleted}>
                   {deleted ? 'This message was deleted' : item.body}
                 </ThemedText>
                 {!deleted && <EditedLabel name={item.editor?.full_name ?? null} at={item.edited_at} />}
-                {!deleted && (mine || info.isAdmin) && (
-                  <View style={styles.actions}>
-                    <TextButton
-                      title="Edit"
-                      onPress={() => {
-                        setEditing(item);
-                        setText(item.body ?? '');
-                      }}
-                    />
-                    <TextButton title="Delete" danger onPress={() => remove(item)} />
-                  </View>
-                )}
+                <View style={styles.meta}>
+                  {!deleted && (mine || info.isAdmin) && (
+                    <>
+                      <TextButton
+                        title="Edit"
+                        onPress={() => {
+                          setEditing(item);
+                          setText(item.body ?? '');
+                        }}
+                      />
+                      <TextButton title="Delete" danger onPress={() => remove(item)} />
+                    </>
+                  )}
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.time}>
+                    {time(item.created_at)}
+                  </ThemedText>
+                </View>
               </View>
             </View>
           );
         }}
       />
 
-      <View style={[styles.composer, { borderTopColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+      <View style={[styles.composer, { borderTopColor: theme.border, backgroundColor: theme.card }]}>
         <View style={styles.composerColumn}>
           <ErrorText>{error ?? data.error}</ErrorText>
           {editing && (
@@ -216,7 +226,13 @@ export function Chat({ info }: { info: SpaceInfo }) {
               submitBehavior="submit"
               style={[styles.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
             />
-            <Button title={editing ? 'Save' : 'Send'} onPress={send} loading={busy} disabled={!text.trim()} />
+            <Button
+              title={editing ? 'Save' : 'Send'}
+              icon={editing ? 'check' : 'send'}
+              onPress={send}
+              loading={busy}
+              disabled={!text.trim()}
+            />
           </View>
         </View>
       </View>
@@ -229,22 +245,25 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: {
     padding: Spacing.three,
-    gap: Spacing.two,
+    gap: 10,
     width: '100%',
     maxWidth: MaxContentWidth + 160,
     alignSelf: 'center',
     flexGrow: 1,
     justifyContent: 'flex-end',
   },
-  row: { width: '100%' },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'flex-end', maxWidth: '88%', alignSelf: 'flex-start' },
+  rowMine: { alignSelf: 'flex-end' },
   bubble: {
-    maxWidth: '85%',
+    flexShrink: 1,
     borderWidth: 1,
-    borderRadius: Radius.medium,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     gap: Spacing.half,
   },
+  meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: Spacing.three },
+  time: { fontSize: 13 },
   deleted: { fontStyle: 'italic' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   composer: { borderTopWidth: 1, padding: Spacing.three, alignItems: 'center' },
@@ -252,12 +271,13 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.two },
   input: {
     flex: 1,
-    minHeight: 54,
+    minHeight: 48,
     maxHeight: 140,
     borderWidth: 1,
-    borderRadius: Radius.medium,
+    borderRadius: 22,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: 11,
     fontSize: 17,
+    fontFamily: Type.body,
   },
 });

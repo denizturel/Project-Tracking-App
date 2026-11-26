@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { inScope, personName, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, EditedLabel, ErrorText, Field, TextButton } from '@/components/ui';
+import { Button, Card, Chip, EditedLabel, ErrorText, Field, TextButton, type Tone } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -128,7 +128,7 @@ function NewQuestion({ info, onSaved }: { info: SpaceInfo; onSaved: () => void }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open) return <Button title="Ask a question or report an error" onPress={() => setOpen(true)} />;
+  if (!open) return <Button title="Ask a question or report an error" icon="plus" inline onPress={() => setOpen(true)} />;
 
   async function save() {
     setBusy(true);
@@ -207,10 +207,10 @@ function QuestionCard({ question, place, me, isAdmin, onChanged }: CardProps) {
   }
 
   return (
-    <Card tint={solved ? 'mint' : 'card'}>
+    <Card>
       <View style={styles.tags}>
-        <Tag text={solved ? 'Solved' : 'Open'} />
-        {place && <Tag text={place} />}
+        <Tag text={solved ? 'Solved' : 'Open'} tone={solved ? 'ok' : 'warn'} />
+        {place && <Tag text={place} tone="sky" />}
         <Tag text={`Asked by ${personName(question.asker)}`} />
         <ThemedText type="small" themeColor="textSecondary">
           {formatDate(question.created_at)}
@@ -288,8 +288,8 @@ function SolutionBox({ solution, canMark, canEdit, busy, run }: SolutionProps) {
     <View style={[styles.solution, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
       <View style={styles.tags}>
         <Tag text={`Solution by ${personName(solution.solver)}`} />
-        {solution.outcome === 'worked' && <Tag text="✓ Confirmed fix" />}
-        {solution.outcome === 'did_not_work' && <Tag text="✕ Tried, did not work" />}
+        {solution.outcome === 'worked' && <Tag text="✓ Confirmed fix" tone="ok" />}
+        {solution.outcome === 'did_not_work' && <Tag text="✕ Tried, did not work" tone="warn" />}
       </View>
 
       {editing ? (
@@ -331,19 +331,14 @@ function SolutionBox({ solution, canMark, canEdit, busy, run }: SolutionProps) {
   );
 }
 
-export function Tag({ text }: { text: string }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
-      <ThemedText type="smallBold">{text}</ThemedText>
-    </View>
-  );
+/** Kept as a thin wrapper so every screen shares the same tags. */
+export function Tag({ text, tone }: { text: string; tone?: Tone }) {
+  return <Chip text={text} tone={tone} />;
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexWrap: 'wrap' },
   tags: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
-  tag: { paddingVertical: Spacing.half, paddingHorizontal: Spacing.two, borderRadius: 999 },
   solution: { borderWidth: 1, borderRadius: 14, padding: Spacing.three, gap: Spacing.two },
   footer: {
     flexDirection: 'row',

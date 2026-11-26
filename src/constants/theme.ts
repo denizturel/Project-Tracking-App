@@ -7,38 +7,53 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+// Same palette as the approved prototype.
 export const Colors = {
   light: {
-    text: '#3B2A22',
-    textSecondary: '#7A6257',
-    background: '#FFF6F0',
-    backgroundElement: '#FFE8DC',
-    backgroundSelected: '#FFD3BF',
+    text: '#3B2A24',
+    textSecondary: '#7A6157',
+    background: '#FFF6EF',
+    /** Soft peach surface for quiet buttons and inner boxes. */
+    backgroundElement: '#FCE9DC',
+    backgroundSelected: '#FFDCC9',
+    /** Side menu. */
+    rail: '#FFE9DB',
     card: '#FFFFFF',
-    border: '#F3D2C1',
-    primary: '#E8825A',
+    border: '#F1DCCD',
+    primary: '#C9603E',
     onPrimary: '#FFFFFF',
-    danger: '#C0453A',
-    lavender: '#E6DEFA',
-    mint: '#D8F2E4',
-    sky: '#DCEBFB',
-    butter: '#FFF1C2',
+    danger: '#B5412F',
+    lavender: '#ECE6FA',
+    lavenderInk: '#5B4C8C',
+    mint: '#DCF2E4',
+    ok: '#2E7A4E',
+    sky: '#E1EEFA',
+    skyInk: '#2F5F8A',
+    butter: '#FFF0C7',
+    warn: '#9A6300',
+    bubbleMe: '#FFE2D2',
   },
   dark: {
-    text: '#FBEDE5',
-    textSecondary: '#CDB3A6',
-    background: '#211815',
-    backgroundElement: '#33241E',
-    backgroundSelected: '#4A3329',
-    card: '#2A1E19',
-    border: '#4A3329',
-    primary: '#F09A75',
-    onPrimary: '#2A1710',
+    text: '#F6E9E1',
+    textSecondary: '#C2A99D',
+    background: '#1D1613',
+    backgroundElement: '#352A25',
+    backgroundSelected: '#4A3025',
+    rail: '#241B17',
+    card: '#28201C',
+    border: '#41332C',
+    primary: '#F4A585',
+    onPrimary: '#2A140B',
     danger: '#F0857B',
-    lavender: '#3A3352',
-    mint: '#24443A',
-    sky: '#25384D',
-    butter: '#4A4020',
+    lavender: '#332C47',
+    lavenderInk: '#CFC3F4',
+    mint: '#1E3427',
+    ok: '#8FD3A8',
+    sky: '#22313F',
+    skyInk: '#A9CCEC',
+    butter: '#3C3018',
+    warn: '#F2C766',
+    bubbleMe: '#4A3025',
   },
 } as const;
 
@@ -65,6 +80,17 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const Radius = { small: 10, medium: 16, large: 24 } as const;
+export const Radius = { small: 10, medium: 12, large: 16 } as const;
 
-export const MaxContentWidth = 720;
+/** Headings use Sora, everything else Manrope, as in the prototype. */
+export const Type = {
+  body: 'Manrope_500Medium',
+  bodyBold: 'Manrope_700Bold',
+  bodyHeavy: 'Manrope_800ExtraBold',
+  head: 'Sora_600SemiBold',
+  headBold: 'Sora_700Bold',
+} as const;
+
+export const MaxContentWidth = 760;
+/** Dashboards with a side column. */
+export const WideContentWidth = 1180;

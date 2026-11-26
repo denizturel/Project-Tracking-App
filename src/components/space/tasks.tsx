@@ -1,3 +1,4 @@
+import Feather from '@expo/vector-icons/Feather';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -115,7 +116,7 @@ function NewTask({ info, onSaved }: { info: SpaceInfo; onSaved: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open) return <Button title="Add a task" onPress={() => setOpen(true)} />;
+  if (!open) return <Button title="Add a task" icon="plus" inline onPress={() => setOpen(true)} />;
 
   async function save() {
     const dueDate = due.trim() ? parseDate(due) : null;
@@ -219,7 +220,7 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
   }
 
   return (
-    <Card tint={done ? 'mint' : 'card'}>
+    <Card>
       <View style={styles.head}>
         <Tick checked={done} enabled={isAdmin && !busy} label={task.title} onPress={() => tick('tasks', task.id, !done)} />
         <Pressable accessibilityRole="button" style={styles.grow} onPress={() => setOpen(!open)}>
@@ -231,11 +232,11 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
       </View>
 
       <View style={styles.tags}>
-        {place && <Tag text={place} />}
-        {task.due_date && <Tag text={`Due ${formatDate(task.due_date)}`} />}
-        {items.length > 0 && <Tag text={`${ticked} of ${items.length} steps`} />}
-        {notes.length > 0 && <Tag text={`${notes.length} note${notes.length === 1 ? '' : 's'}`} />}
-        {done && <Tag text={`✓ Ticked off by ${personName(task.ticker)}`} />}
+        {place && <Tag text={place} tone="sky" />}
+        {task.due_date && <Tag text={`Due ${formatDate(task.due_date)}`} tone={done ? 'plain' : 'accent'} />}
+        {items.length > 0 && <Tag text={`${ticked} of ${items.length} steps`} tone="plain" />}
+        {notes.length > 0 && <Tag text={`${notes.length} note${notes.length === 1 ? '' : 's'}`} tone="plain" />}
+        {done && <Tag text={`✓ Ticked off by ${personName(task.ticker)}`} tone="ok" />}
       </View>
       <EditedLabel name={task.edited_at ? personName(task.editor) : null} at={task.edited_at} />
 
@@ -350,9 +351,13 @@ export function Tick(props: { checked: boolean; enabled: boolean; label: string;
       hitSlop={8}
       style={[
         styles.tick,
-        { borderColor: theme.primary, backgroundColor: props.checked ? theme.primary : 'transparent' },
+        {
+          borderColor: props.checked ? theme.ok : theme.textSecondary,
+          backgroundColor: props.checked ? theme.ok : 'transparent',
+          opacity: props.enabled || props.checked ? 1 : 0.55,
+        },
       ]}>
-      {props.checked && <ThemedText style={{ color: theme.onPrimary, fontWeight: 700 }}>✓</ThemedText>}
+      {props.checked && <Feather name="check" size={18} color={theme.card} />}
     </Pressable>
   );
 }
@@ -364,5 +369,5 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
   struck: { textDecorationLine: 'line-through', opacity: 0.7 },
   note: { gap: Spacing.half, paddingVertical: Spacing.one },
-  tick: { width: 30, height: 30, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  tick: { width: 28, height: 28, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
