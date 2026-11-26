@@ -143,3 +143,42 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
 });
+
+/** Small text button for actions inside a row (Edit, Remove, Make admin). */
+export function TextButton(props: { title: string; onPress: () => void; danger?: boolean; disabled?: boolean }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={props.disabled}
+      onPress={props.onPress}
+      hitSlop={8}
+      style={({ pressed }) => ({ opacity: props.disabled ? 0.4 : pressed ? 0.6 : 1, paddingVertical: Spacing.one })}>
+      <ThemedText type="smallBold" style={{ color: props.danger ? theme.danger : theme.primary }}>
+        {props.title}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+/** "Edited by <name>" label shown under anything that was edited (decided by Deniz). */
+export function EditedLabel({ name, at }: { name: string | null; at: string | null }) {
+  if (!at) return null;
+  return (
+    <ThemedText type="small" themeColor="textSecondary" style={{ fontStyle: 'italic' }}>
+      Edited{name ? ` by ${name}` : ''}
+    </ThemedText>
+  );
+}
+
+export function ComingNext({ what }: { what: string }) {
+  return (
+    <Card tint="butter">
+      <ThemedText type="bold">{what} is coming next</ThemedText>
+      <ThemedText themeColor="textSecondary">
+        This part of the app is designed and its place in the database is ready. The screen is not
+        built yet.
+      </ThemedText>
+    </Card>
+  );
+}

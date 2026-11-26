@@ -1,142 +1,73 @@
-import { Link } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
+import { Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, ErrorText, Field, Screen } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
-import { type Company, type CompanyRole, type Project, supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 
-type Space = Company & { role: CompanyRole; projects: Project[] };
-
-async function fetchSpaces(userId: string): Promise<{ spaces: Space[] | null; error: string | null }> {
-  const [memberships, projects] = await Promise.all([
-    supabase.from('company_members').select('role, companies(id, name)').eq('user_id', userId),
-    supabase
-      .from('projects')
-      .select('id, company_id, name, description, restrict_to_subgroups, edited_at')
-      .order('name'),
-  ]);
-  const failed = memberships.error ?? projects.error;
-  if (failed) return { spaces: null, error: failed.message };
-
-  const spaces = (memberships.data ?? []).flatMap((row) => {
-    const company = row.companies as unknown as Company | null;
-    if (!company) return [];
-    return [
-      {
-        ...company,
-        role: row.role as CompanyRole,
-        projects: (projects.data ?? []).filter((p) => p.company_id === company.id),
-      },
-    ];
-  });
-  return { spaces, error: null };
-}
-
-export default function ProjectsScreen() {
-  const { session, profile, signOut } = useAuth();
+/** Home: on phones the side menu comes first, then the things you can start from here. */
+export default function HomeScreen() {
   const theme = useTheme();
-  const userId = session?.user.id;
+  const { profile } = useAuth();
+  const { companies, projects, loading, error } = useWorkspace();
+  const wide = useWindowDimensions().width >= WIDE_SCREEN;
 
-  const [spaces, setSpaces] = useState<Space[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [version, setVersion] = useState(0);
-  const load = useCallback(async () => setVersion((v) => v + 1), []);
-
-  useEffect(() => {
-    if (!userId) return;
-    let active = true;
-    fetchSpaces(userId).then((result) => {
-      if (!active) return;
-      setError(result.error);
-      if (result.spaces) setSpaces(result.spaces);
-    });
-    return () => {
-      active = false;
-    };
-  }, [userId, version]);
+  const adminOf = companies.filter((c) => c.role === 'owner' || c.role === 'admin');
 
   return (
     <Screen>
       <Card tint="backgroundElement">
         <ThemedText type="subtitle">Hello, {profile?.full_name}</ThemedText>
         <ThemedText themeColor="textSecondary">
-          {profile?.position} at {profile?.company_name}
+          {projects.length > 0
+            ? wide
+              ? 'Pick a project, group or team from the menu on the left.'
+              : 'Pick a project, group or team below.'
+            : 'Start by creating a company space and a project, or join with an invitation code.'}
         </ThemedText>
       </Card>
 
       <ErrorText>{error}</ErrorText>
-      {spaces === null && !error && <ActivityIndicator color={theme.primary} size="large" />}
+      {loading && <ActivityIndicator color={theme.primary} size="large" />}
 
-      {spaces?.map((space) => {
-        const canCreate = space.role === 'owner' || space.role === 'admin';
-        return (
-          <Card key={space.id}>
-            <View style={{ gap: Spacing.half }}>
-              <ThemedText type="subtitle">{space.name}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Company space · you are {space.role === 'owner' ? 'the owner' : `a ${space.role}`}
-              </ThemedText>
-            </View>
+      {!wide && projects.length > 0 && (
+        <View style={{ borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: theme.border }}>
+          <Sidebar />
+        </View>
+      )}
 
-            {space.projects.length === 0 && (
-              <ThemedText themeColor="textSecondary">
-                {canCreate
-                  ? 'No projects yet. Create the first one below.'
-                  : 'You have not been added to a project here yet.'}
-              </ThemedText>
-            )}
+      {adminOf.map((company) => (
+        <NewProject key={company.id} companyId={company.id} companyName={company.name} />
+      ))}
 
-            {space.projects.map((project) => (
-              <Link key={project.id} href={{ pathname: '/project/[id]', params: { id: project.id } }} asChild>
-                <Pressable
-                  accessibilityRole="link"
-                  style={({ pressed }) => ({
-                    backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
-                    borderRadius: 16,
-                    padding: Spacing.three,
-                    gap: Spacing.half,
-                  })}>
-                  <ThemedText type="bold">{project.name}</ThemedText>
-                  {!!project.description && (
-                    <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-                      {project.description}
-                    </ThemedText>
-                  )}
-                </Pressable>
-              </Link>
-            ))}
-
-            {canCreate && <NewProject companyId={space.id} onCreated={load} />}
-          </Card>
-        );
-      })}
-
-      {spaces !== null && <NewCompany first={spaces.length === 0} onCreated={load} />}
-
-      <Button title="Sign out" variant="plain" onPress={signOut} />
+      {!loading && <JoinWithCode />}
+      {!loading && <NewCompany first={companies.length === 0} />}
     </Screen>
   );
 }
 
-function NewProject({ companyId, onCreated }: { companyId: string; onCreated: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
+function NewProject({ companyId, companyName }: { companyId: string; companyName: string }) {
+  const router = useRouter();
+  const { reload } = useWorkspace();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open) return <Button title="New project" variant="secondary" onPress={() => setOpen(true)} />;
-
   async function create() {
     setBusy(true);
     setError(null);
-    const { error: failed } = await supabase
+    const { data, error: failed } = await supabase
       .from('projects')
-      .insert({ company_id: companyId, name: name.trim(), description: description.trim() || null });
+      .insert({ company_id: companyId, name: name.trim(), description: description.trim() || null })
+      .select('id')
+      .single();
     setBusy(false);
     if (failed) {
       setError(failed.message);
@@ -144,22 +75,63 @@ function NewProject({ companyId, onCreated }: { companyId: string; onCreated: ()
     }
     setName('');
     setDescription('');
-    setOpen(false);
-    await onCreated();
+    reload();
+    // Straight into the new project's workspace.
+    router.push({ pathname: '/project/[id]', params: { id: data.id } });
   }
 
   return (
-    <View style={{ gap: Spacing.three }}>
+    <Card>
+      <View style={{ gap: Spacing.half }}>
+        <ThemedText type="subtitle">New project</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          In the company space {companyName}
+        </ThemedText>
+      </View>
       <Field label="Project name" required value={name} onChangeText={setName} />
       <Field label="Description" value={description} onChangeText={setDescription} multiline />
       <ErrorText>{error}</ErrorText>
       <Button title="Create project" onPress={create} loading={busy} disabled={!name.trim()} />
-      <Button title="Cancel" variant="plain" onPress={() => setOpen(false)} disabled={busy} />
-    </View>
+    </Card>
   );
 }
 
-function NewCompany({ first, onCreated }: { first: boolean; onCreated: () => Promise<void> }) {
+function JoinWithCode() {
+  const router = useRouter();
+  const { reload } = useWorkspace();
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function join() {
+    setBusy(true);
+    setError(null);
+    const { error: failed } = await supabase.rpc('accept_invitation', { invite_token: code.trim() });
+    setBusy(false);
+    if (failed) {
+      setError(failed.message);
+      return;
+    }
+    setCode('');
+    reload();
+    router.replace('/');
+  }
+
+  return (
+    <Card tint="sky">
+      <ThemedText type="subtitle">Have an invitation code?</ThemedText>
+      <ThemedText themeColor="textSecondary">
+        An admin can invite your email address to a project and send you a code. Paste it here.
+      </ThemedText>
+      <Field label="Invitation code" value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} />
+      <ErrorText>{error}</ErrorText>
+      <Button title="Join" variant="secondary" onPress={join} loading={busy} disabled={code.trim().length < 8} />
+    </Card>
+  );
+}
+
+function NewCompany({ first }: { first: boolean }) {
+  const { reload } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -176,7 +148,7 @@ function NewCompany({ first, onCreated }: { first: boolean; onCreated: () => Pro
     }
     setName('');
     setOpen(false);
-    await onCreated();
+    reload();
   }
 
   if (!open && !first) {
@@ -188,7 +160,7 @@ function NewCompany({ first, onCreated }: { first: boolean; onCreated: () => Pro
       <ThemedText type="subtitle">{first ? 'Start your company space' : 'New company space'}</ThemedText>
       <ThemedText themeColor="textSecondary">
         {first
-          ? 'If someone invited you, open the link in their invitation instead. Otherwise create a space for your company and you become its owner.'
+          ? 'Create a space for your company and you become its owner. Then you can create its first project.'
           : 'A separate, closed space with its own people and projects.'}
       </ThemedText>
       <Field label="Company name" required value={name} onChangeText={setName} />
