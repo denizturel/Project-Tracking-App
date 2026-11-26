@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { TextButton } from '@/components/ui';
 import { Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -15,17 +16,24 @@ const MARKS: ThemeColor[] = ['lavender', 'mint', 'sky', 'butter'];
 export function Sidebar() {
   const theme = useTheme();
   const { profile, signOut } = useAuth();
+  const lock = useAppLock();
+  const [lockError, setLockError] = useState<string | null>(null);
   const { companies, projects, subgroups, loading } = useWorkspace();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
 
   const toggle = (id: string) => setFolded((f) => ({ ...f, [id]: !f[id] }));
-  const foldable = [...projects.map((p) => p.id), ...subgroups.filter((s) => !s.parent_id).map((s) => s.id)];
-  const setAll = (value: boolean) => setFolded(Object.fromEntries(foldable.map((id) => [id, value])));
+  const foldable = [
+    ...projects.map((p) => p.id),
+    ...subgroups.filter((s) => !s.parent_id).map((s) => s.id),
+  ];
+  const setAll = (value: boolean) =>
+    setFolded(Object.fromEntries(foldable.map((id) => [id, value])));
 
   return (
     <ScrollView
       style={{ backgroundColor: theme.backgroundElement }}
-      contentContainerStyle={styles.content}>
+      contentContainerStyle={styles.content}
+    >
       <Row href="/" label="Home" depth={0} bold />
 
       <View style={styles.sectionHeader}>
@@ -106,6 +114,17 @@ export function Sidebar() {
         <ThemedText type="small" themeColor="textSecondary">
           {profile?.position} at {profile?.company_name}
         </ThemedText>
+        {lock.available && (
+          <TextButton
+            title={lock.enabled ? `Turn off ${lock.method} unlock` : `Unlock with ${lock.method}`}
+            onPress={async () => setLockError(await lock.setEnabled(!lock.enabled))}
+          />
+        )}
+        {lockError && (
+          <ThemedText type="small" themeColor="danger">
+            {lockError}
+          </ThemedText>
+        )}
         <TextButton title="Sign out" onPress={signOut} />
       </View>
     </ScrollView>
@@ -126,7 +145,8 @@ type RowProps = {
 function Row({ href, label, depth, bold, mark, folded, onToggle }: RowProps) {
   const theme = useTheme();
   const pathname = usePathname();
-  const target = typeof href === 'string' ? href : href.pathname.replace('[id]', String(href.params?.id));
+  const target =
+    typeof href === 'string' ? href : href.pathname.replace('[id]', String(href.params?.id));
   const active = pathname === target;
 
   return (
@@ -140,7 +160,8 @@ function Row({ href, label, depth, bold, mark, folded, onToggle }: RowProps) {
           accessibilityLabel={folded ? `Expand ${label}` : `Collapse ${label}`}
           onPress={onToggle}
           hitSlop={8}
-          style={styles.chevron}>
+          style={styles.chevron}
+        >
           <ThemedText themeColor="textSecondary">{folded ? '▸' : '▾'}</ThemedText>
         </Pressable>
       )}
@@ -150,9 +171,18 @@ function Row({ href, label, depth, bold, mark, folded, onToggle }: RowProps) {
           style={({ pressed }) => [
             styles.link,
             { backgroundColor: active || pressed ? theme.backgroundSelected : 'transparent' },
-          ]}>
-          {mark && <View style={[styles.mark, { backgroundColor: theme[mark], borderColor: theme.border }]} />}
-          <ThemedText type={bold || active ? 'bold' : 'default'} numberOfLines={1} style={styles.label}>
+          ]}
+        >
+          {mark && (
+            <View
+              style={[styles.mark, { backgroundColor: theme[mark], borderColor: theme.border }]}
+            />
+          )}
+          <ThemedText
+            type={bold || active ? 'bold' : 'default'}
+            numberOfLines={1}
+            style={styles.label}
+          >
             {label}
           </ThemedText>
         </Pressable>

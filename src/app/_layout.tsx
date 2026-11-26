@@ -3,7 +3,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { LockScreen } from '@/components/lock-screen';
 import { useTheme } from '@/hooks/use-theme';
+import { AppLockProvider, useAppLock } from '@/lib/app-lock';
 import { AuthProvider, useAuth } from '@/lib/auth';
 
 SplashScreen.preventAutoHideAsync();
@@ -12,7 +14,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="auto" />
-      <RootNavigator />
+      <AppLockProvider>
+        <RootNavigator />
+      </AppLockProvider>
     </AuthProvider>
   );
 }
@@ -20,6 +24,7 @@ export default function RootLayout() {
 function RootNavigator() {
   const { loading, session, profile } = useAuth();
   const theme = useTheme();
+  const { locked } = useAppLock();
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();
@@ -32,13 +37,31 @@ function RootNavigator() {
   const ready = signedIn && !!profile?.profile_complete;
 
   return (
+    <>
+      <Screens signedIn={signedIn} ready={ready} theme={theme} />
+      {signedIn && locked && <LockScreen />}
+    </>
+  );
+}
+
+function Screens({
+  signedIn,
+  ready,
+  theme,
+}: {
+  signedIn: boolean;
+  ready: boolean;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: theme.backgroundElement },
         headerTintColor: theme.text,
         headerTitleStyle: { fontSize: 20, fontWeight: 700 },
         contentStyle: { backgroundColor: theme.background },
-      }}>
+      }}
+    >
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       </Stack.Protected>
