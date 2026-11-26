@@ -96,7 +96,9 @@ export function Overview({ info }: { info: SpaceInfo }) {
 function Details({ info }: { info: SpaceInfo }) {
   const router = useRouter();
   const { reload } = useWorkspace();
-  const { project, subgroup, parent, level, isAdmin } = info;
+  const { project, subgroup, parent, level, isAdmin, isProjectAdmin } = info;
+  // A group's own admin manages its teams but cannot delete the group itself.
+  const canDelete = !!subgroup && (level === 'team' || isProjectAdmin);
   const item = subgroup ?? project;
   const table = subgroup ? 'subgroups' : 'projects';
 
@@ -166,10 +168,10 @@ function Details({ info }: { info: SpaceInfo }) {
       {isAdmin && (
         <View style={{ flexDirection: 'row', gap: Spacing.four, flexWrap: 'wrap' }}>
           <TextButton title="Edit" onPress={() => setEditing(true)} />
-          {subgroup && !confirmDelete && (
+          {canDelete && !confirmDelete && (
             <TextButton title={`Delete this ${level}`} danger onPress={() => setConfirmDelete(true)} />
           )}
-          {subgroup && confirmDelete && (
+          {canDelete && confirmDelete && (
             <>
               <TextButton
                 title={`Yes, delete it with its chat${level === 'group' ? ' and teams' : ''}`}

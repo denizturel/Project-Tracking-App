@@ -32,7 +32,7 @@ async function fetchPeople(info: SpaceInfo): Promise<Loaded> {
   const [project, here, invitations] = await Promise.all([
     supabase.from('project_members').select(`user_id, role, ${PROFILE}`).eq('project_id', info.project.id),
     info.subgroup
-      ? supabase.from('subgroup_members').select(`user_id, ${PROFILE}`).eq('subgroup_id', info.subgroup.id)
+      ? supabase.from('subgroup_members').select(`user_id, role, ${PROFILE}`).eq('subgroup_id', info.subgroup.id)
       : null,
     info.isAdmin && !info.subgroup
       ? supabase
@@ -97,12 +97,13 @@ export function People({ info }: { info: SpaceInfo }) {
 
       {level !== 'project' && people.length === 0 && (
         <ThemedText themeColor="textSecondary">
-          Nobody has been added to this {level} yet. Project admins can always see it.
+          Nobody has been added to this {level} yet. Project and company admins can always see it.
         </ThemedText>
       )}
 
       {people.map((person) => {
         const role = roleOf.get(person.user_id);
+        const ownAdmin = !!subgroup && person.role === 'admin';
         return (
           <Card key={person.user_id} style={{ gap: Spacing.one }}>
             <ThemedText type="bold">
@@ -111,7 +112,8 @@ export function People({ info }: { info: SpaceInfo }) {
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {[person.profile?.position, person.profile?.company_name].filter(Boolean).join(' at ')}
-              {role === 'admin' ? ' · Admin' : ''}
+              {role === 'admin' ? ' · Project admin' : ''}
+              {ownAdmin ? ` · Admin of this ${level}` : ''}
             </ThemedText>
             {isAdmin && (
               <View style={{ flexDirection: 'row', gap: Spacing.four, flexWrap: 'wrap' }}>
@@ -124,6 +126,20 @@ export function People({ info }: { info: SpaceInfo }) {
                           .from('project_members')
                           .update({ role: role === 'admin' ? 'member' : 'admin' })
                           .eq('project_id', project.id)
+                          .eq('user_id', person.user_id),
+                      )
+                    }
+                  />
+                )}
+                {subgroup && (
+                  <TextButton
+                    title={ownAdmin ? `Remove as admin of this ${level}` : `Make admin of this ${level}`}
+                    onPress={() =>
+                      run(
+                        supabase
+                          .from('subgroup_members')
+                          .update({ role: ownAdmin ? 'member' : 'admin' })
+                          .eq('subgroup_id', subgroup.id)
                           .eq('user_id', person.user_id),
                       )
                     }

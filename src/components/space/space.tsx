@@ -23,7 +23,10 @@ export type SpaceInfo = {
   subgroup: SubgroupNode | null;
   /** The group a team sits in. */
   parent: SubgroupNode | null;
+  /** May manage this page: a project admin, or the own admin of this group or team (or of its group). */
   isAdmin: boolean;
+  /** Admin of the whole project (includes company owners and admins). */
+  isProjectAdmin: boolean;
 };
 
 const FULL_TABS = ['Overview', 'Chat', 'Tasks', 'Schedule', 'Questions & solutions', 'Training', 'Media, links, docs', 'People'];
@@ -33,7 +36,7 @@ const TEAM_CHAT_TABS = ['Messages', 'Media, links, docs', 'People', 'Schedule'];
 
 export function Space(props: { projectId: string } | { subgroupId: string }) {
   const theme = useTheme();
-  const { projects, subgroups, loading, error } = useWorkspace();
+  const { projects, subgroups, adminSubgroups, loading, error } = useWorkspace();
   const [tab, setTab] = useState('Overview');
   const [chatTab, setChatTab] = useState('Messages');
 
@@ -63,7 +66,10 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
     project,
     subgroup,
     parent,
-    isAdmin: project.myRole === 'admin',
+    isAdmin:
+      project.myRole === 'admin' ||
+      (!!subgroup && (adminSubgroups.includes(subgroup.id) || adminSubgroups.includes(subgroup.parent_id ?? ''))),
+    isProjectAdmin: project.myRole === 'admin',
   };
   const name = subgroup?.name ?? project.name;
   // A project that has groups but no teams anywhere (for example one single hotel

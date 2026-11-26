@@ -7,7 +7,13 @@ export type CompanyNode = Company & { role: CompanyRole };
 export type ProjectNode = Project & { myRole: 'admin' | 'member' | null; editor: string | null };
 export type SubgroupNode = Subgroup & { edited_at: string | null; editor: string | null };
 
-type Tree = { companies: CompanyNode[]; projects: ProjectNode[]; subgroups: SubgroupNode[] };
+type Tree = {
+  companies: CompanyNode[];
+  projects: ProjectNode[];
+  subgroups: SubgroupNode[];
+  /** Groups and teams where the signed-in person is that group's or team's own admin. */
+  adminSubgroups: string[];
+};
 
 type WorkspaceValue = Tree & {
   /** True until the first load has finished. */
@@ -16,7 +22,7 @@ type WorkspaceValue = Tree & {
   reload: () => void;
 };
 
-const empty: Tree = { companies: [], projects: [], subgroups: [] };
+const empty: Tree = { companies: [], projects: [], subgroups: [], adminSubgroups: [] };
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 export function useWorkspace() {
@@ -30,7 +36,7 @@ const editorName = (value: unknown) => (value as Editor)?.full_name ?? null;
 
 /** Everything the signed-in person may see: the database rules do the filtering. */
 async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: string | null }> {
-  const [memberships, projects, roles, subgroups] = await Promise.all([
+  const [memberships, projects, roles, subgroups, ownGroups] = await Promise.all([
     supabase.from('company_members').select('role, companies(id, name)').eq('user_id', userId),
     supabase
       .from('projects')
@@ -45,22 +51,29 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
         'id, project_id, parent_id, name, description, color, edited_at, editor:profiles!edited_by(full_name)',
       )
       .order('name'),
+    supabase.from('subgroup_members').select('subgroup_id').eq('user_id', userId).eq('role', 'admin'),
   ]);
-  const failed = memberships.error ?? projects.error ?? roles.error ?? subgroups.error;
+  const failed =
+    memberships.error ?? projects.error ?? roles.error ?? subgroups.error ?? ownGroups.error;
   if (failed) return { tree: null, error: failed.message };
 
   const roleOf = new Map((roles.data ?? []).map((r) => [r.project_id as string, r.role as 'admin' | 'member']));
 
+  const companies = (memberships.data ?? []).flatMap((row) => {
+    const company = row.companies as unknown as Company | null;
+    return company ? [{ ...company, role: row.role as CompanyRole }] : [];
+  });
+  // Company owners and admins manage every project in their company.
+  const managed = new Set(companies.filter((c) => c.role === 'owner' || c.role === 'admin').map((c) => c.id));
+
   return {
     error: null,
     tree: {
-      companies: (memberships.data ?? []).flatMap((row) => {
-        const company = row.companies as unknown as Company | null;
-        return company ? [{ ...company, role: row.role as CompanyRole }] : [];
-      }),
+      companies,
+      adminSubgroups: (ownGroups.data ?? []).map((row) => row.subgroup_id as string),
       projects: (projects.data ?? []).map(({ editor, ...p }) => ({
         ...(p as Project),
-        myRole: roleOf.get(p.id) ?? null,
+        myRole: managed.has(p.company_id) ? 'admin' : (roleOf.get(p.id) ?? null),
         editor: editorName(editor),
       })),
       subgroups: (subgroups.data ?? []).map(({ editor, ...s }) => ({

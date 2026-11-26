@@ -4,12 +4,13 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, ErrorText, Field, Screen } from '@/components/ui';
+import { Button, Card, ErrorText, Field, Screen, TextButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
+import { useRows } from '@/lib/use-rows';
+import { type CompanyNode, useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 
 /** Home: on phones the side menu comes first, then the things you can start from here. */
 export default function HomeScreen() {
@@ -45,10 +46,82 @@ export default function HomeScreen() {
       {adminOf.map((company) => (
         <NewProject key={company.id} companyId={company.id} companyName={company.name} />
       ))}
+      {adminOf.map((company) => (
+        <CompanyPeople key={company.id} company={company} />
+      ))}
 
       {!loading && <JoinWithCode />}
       {!loading && <NewCompany first={companies.length === 0} />}
     </Screen>
+  );
+}
+
+type CompanyPerson = {
+  user_id: string;
+  role: 'owner' | 'admin' | 'member' | 'guest';
+  profile: { full_name: string; position: string | null } | null;
+};
+
+const ROLE_WORDS = { owner: 'Owner', admin: 'Company admin', member: 'Member', guest: 'Guest' };
+
+/** Who is in the company space. Owners and company admins choose the company admins. */
+function CompanyPeople({ company }: { company: CompanyNode }) {
+  const { session } = useAuth();
+  const me = session?.user.id;
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const { rows, error, reload } = useRows<CompanyPerson>(company.id, () =>
+    supabase
+      .from('company_members')
+      .select('user_id, role, profile:profiles!user_id(full_name, position)')
+      .eq('company_id', company.id)
+      .returns<CompanyPerson[]>(),
+  );
+
+  if (!open) {
+    return <Button title={`People and admins of ${company.name}`} variant="plain" onPress={() => setOpen(true)} />;
+  }
+
+  async function setRole(userId: string, role: 'admin' | 'member') {
+    const result = await supabase
+      .from('company_members')
+      .update({ role })
+      .eq('company_id', company.id)
+      .eq('user_id', userId);
+    setFailed(result.error?.message ?? null);
+    reload();
+  }
+
+  const people = [...rows].sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
+
+  return (
+    <Card tint="lavender">
+      <ThemedText type="subtitle">People of {company.name}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Company admins can see and manage every project, group and team of this company and create new
+        projects. Guests see only the projects they were added to.
+      </ThemedText>
+      <ErrorText>{failed ?? error}</ErrorText>
+      {people.map((person) => (
+        <View key={person.user_id} style={{ gap: Spacing.half }}>
+          <ThemedText type="bold">
+            {person.profile?.full_name ?? 'Unknown'}
+            {person.user_id === me ? ' (you)' : ''}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {[person.profile?.position, ROLE_WORDS[person.role]].filter(Boolean).join(' · ')}
+          </ThemedText>
+          {person.user_id !== me && person.role !== 'owner' && (
+            <TextButton
+              title={person.role === 'admin' ? 'Remove company admin rights' : 'Make company admin'}
+              onPress={() => setRole(person.user_id, person.role === 'admin' ? 'member' : 'admin')}
+            />
+          )}
+        </View>
+      ))}
+      <Button title="Close" variant="plain" onPress={() => setOpen(false)} />
+    </Card>
   );
 }
 
