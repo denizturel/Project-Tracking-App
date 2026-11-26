@@ -2,9 +2,10 @@ import { Manrope_500Medium, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-
 import { Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 import Feather from '@expo/vector-icons/Feather';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { Fragment, useEffect } from 'react';
 
 import { LockScreen } from '@/components/lock-screen';
@@ -47,6 +48,17 @@ function RootNavigator() {
     if (!waiting) SplashScreen.hideAsync();
   }, [waiting]);
 
+  // What shows behind the pages while one changes into another. Without this it is plain white or black.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
+  }, [theme.background]);
+  const base = dark ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...base,
+    dark,
+    colors: { ...base.colors, background: theme.background, card: theme.card, text: theme.text, border: theme.border, primary: theme.primary },
+  };
+
   if (waiting) return null;
 
   const signedIn = !!session;
@@ -54,14 +66,14 @@ function RootNavigator() {
   const ready = signedIn && !!profile?.profile_complete && !!profile.username;
 
   return (
-    <>
+    <ThemeProvider value={navigationTheme}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       {/* A new language draws every screen again from the start. */}
       <Fragment key={lang}>
         <Screens signedIn={signedIn} ready={ready} theme={theme} dark={dark} />
         {signedIn && locked && <LockScreen />}
       </Fragment>
-    </>
+    </ThemeProvider>
   );
 }
 
@@ -84,6 +96,7 @@ function Screens({
         headerTintColor: theme.text,
         headerTitleStyle: { fontSize: 20, fontFamily: 'Sora_600SemiBold' },
         contentStyle: { backgroundColor: theme.background },
+        animation: 'fade',
       }}
     >
       <Stack.Protected guard={!signedIn}>
