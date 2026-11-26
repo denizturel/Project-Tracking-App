@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensio
 
 import { Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, Chip, ErrorText, Field, Icon, TextButton } from '@/components/ui';
+import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon } from '@/components/ui';
 import { Spacing, type ThemeColor, WideContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -269,13 +269,19 @@ const styles = StyleSheet.create({
 
 type CompanyPerson = {
   user_id: string;
-  role: 'owner' | 'admin' | 'member' | 'guest';
+  role: 'owner' | 'admin' | 'manager' | 'member' | 'guest';
   profile: { full_name: string; position: string | null } | null;
 };
 
-const ROLE_WORDS = { owner: 'Owner', admin: 'Company admin', member: 'Member', guest: 'Guest' };
+const ROLE_WORDS = { owner: 'Owner', admin: 'Company admin', manager: 'Manager', member: 'Staff', guest: 'Guest' };
+const COMPANY_ROLES = [
+  { value: 'admin', label: 'Company admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'member', label: 'Staff' },
+  { value: 'guest', label: 'Guest' },
+] as const;
 
-/** Who is in the company space. Owners and company admins choose the company admins. */
+/** Who is in the company space. Owners and company admins choose who is a company admin, manager or staff. */
 function CompanyPeople({ company }: { company: CompanyNode }) {
   const { session } = useAuth();
   const me = session?.user.id;
@@ -301,7 +307,7 @@ function CompanyPeople({ company }: { company: CompanyNode }) {
     );
   }
 
-  async function setRole(userId: string, role: 'admin' | 'member') {
+  async function setRole(userId: string, role: 'admin' | 'manager' | 'member' | 'guest') {
     const result = await supabase
       .from('company_members')
       .update({ role })
@@ -317,24 +323,27 @@ function CompanyPeople({ company }: { company: CompanyNode }) {
     <Card tint="lavender">
       <ThemedText type="subtitle">People of {company.name}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        Company admins can see and manage every project, group and team of this company and create new
-        projects. Guests see only the projects they were added to.
+        Whoever creates the company space is its owner. Company admins see and manage every project, group and
+        team and create new projects. Managers see every project, group and team but do not manage them. Staff
+        and guests see only what they were added to.
       </ThemedText>
       <ErrorText>{failed ?? error}</ErrorText>
       {people.map((person) => (
-        <View key={person.user_id} style={{ gap: Spacing.half }}>
-          <ThemedText type="bold">
-            {person.profile?.full_name ?? 'Unknown'}
-            {person.user_id === me ? ' (you)' : ''}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {[person.profile?.position, ROLE_WORDS[person.role]].filter(Boolean).join(' · ')}
-          </ThemedText>
+        <View key={person.user_id} style={{ gap: Spacing.two }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Avatar name={person.profile?.full_name} size={36} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ThemedText type="bold">
+                {person.profile?.full_name ?? 'Unknown'}
+                {person.user_id === me ? ' (you)' : ''}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {[person.profile?.position, ROLE_WORDS[person.role]].filter(Boolean).join(' · ')}
+              </ThemedText>
+            </View>
+          </View>
           {person.user_id !== me && person.role !== 'owner' && (
-            <TextButton
-              title={person.role === 'admin' ? 'Remove company admin rights' : 'Make company admin'}
-              onPress={() => setRole(person.user_id, person.role === 'admin' ? 'member' : 'admin')}
-            />
+            <Choices options={COMPANY_ROLES} value={person.role} onChange={(role) => setRole(person.user_id, role)} />
           )}
         </View>
       ))}

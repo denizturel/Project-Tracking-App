@@ -20,6 +20,11 @@ export type Milestone = {
   done: boolean;
   edited_at: string | null;
   editor: unknown;
+  /** Missing until the database has the meeting columns; then 'milestone' or 'meeting'. */
+  kind?: 'milestone' | 'meeting';
+  starts_at?: string | null;
+  ends_at?: string | null;
+  location?: string | null;
 };
 
 export const SCHEDULE_VIEWS = ['List', 'Timeline', 'Calendar'] as const;
@@ -44,6 +49,8 @@ function span(m: Milestone) {
 
 export function statusOf(m: Milestone): Status {
   if (m.done) return 'done';
+  // A meeting is simply over once its day has passed.
+  if (m.kind === 'meeting') return m.due_date && toDate(m.due_date) < today() ? 'done' : 'next';
   const s = span(m);
   return s && s.from <= today() ? 'now' : 'next';
 }
@@ -57,24 +64,40 @@ export function dateText(m: Milestone) {
   return `${short(s.from)} – ${short(s.to)}`;
 }
 
-export function percentAlong(list: Milestone[]) {
+export function percentAlong(all: Milestone[]) {
+  const list = all.filter((m) => !isMeeting(m));
   if (list.length === 0) return 0;
   const done = list.filter((m) => m.done).length;
   const now = list.filter((m) => statusOf(m) === 'now').length;
   return Math.round(((done + 0.5 * now) / list.length) * 100);
 }
 
-/** Every milestone of the project; pages pick the ones for their own place. */
+const BASE = 'id, subgroup_id, title, start_date, due_date, done, edited_at, editor:profiles!edited_by(full_name)';
+
+/** Every milestone and meeting of the project; pages pick the ones for their own place. */
 export function useMilestones(projectId: string) {
-  return useRows<Milestone>(projectId, () =>
-    supabase
-      .from('milestones')
-      .select('id, subgroup_id, title, start_date, due_date, done, edited_at, editor:profiles!edited_by(full_name)')
-      .eq('project_id', projectId)
-      .order('due_date', { ascending: true, nullsFirst: false })
-      .returns<Milestone[]>(),
-  );
+  return useRows<Milestone>(projectId, async () => {
+    const load = (columns: string) =>
+      supabase
+        .from('milestones')
+        .select(columns)
+        .eq('project_id', projectId)
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .returns<Milestone[]>();
+    const full = await load(`${BASE}, kind, starts_at, ends_at, location`);
+    // Before the meeting columns exist in the database, the schedule still works with milestones only.
+    return full.error ? load(BASE) : full;
+  });
 }
+
+export const isMeeting = (m: Milestone) => m.kind === 'meeting';
+const clock = (value?: string | null) => (value ? value.slice(0, 5) : '');
+/** "10:00–11:30" */
+export const timeText = (m: Milestone) => [clock(m.starts_at), clock(m.ends_at)].filter(Boolean).join('–');
+const parseTime = (text: string) => {
+  const match = /^(\d{1,2})[:.](\d{2})$/.exec(text.trim());
+  return match && +match[1] < 24 && +match[2] < 60 ? `${match[1].padStart(2, '0')}:${match[2]}` : null;
+};
 
 /** Schedule tab: this place's own schedule first, then one card for each team inside a group. */
 export function Schedule({ info }: { info: SpaceInfo }) {
@@ -136,6 +159,9 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
         {info.isAdmin && (
           <Button title="Add milestone" icon="plus" variant="secondary" small onPress={() => setEditing('new')} />
         )}
+        {info.isAdmin && (
+          <Button title="Add meeting" icon="video" variant="secondary" small onPress={() => setEditing('meeting')} />
+        )}
         <ThemedText type="small" themeColor="textSecondary">
           {percent}% along
         </ThemedText>
@@ -144,13 +170,19 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
         <View style={[styles.barFill, { backgroundColor: theme.primary, width: `${Math.max(percent, 2)}%` }]} />
       </View>
 
-      {editing === 'new' && (
-        <MilestoneForm info={info} place={place} onClose={() => setEditing(null)} onChanged={onChanged} />
+      {(editing === 'new' || editing === 'meeting') && (
+        <MilestoneForm
+          info={info}
+          place={place}
+          meeting={editing === 'meeting'}
+          onClose={() => setEditing(null)}
+          onChanged={onChanged}
+        />
       )}
 
       {list.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary">
-          No milestones yet.{info.isAdmin ? ' Add the first one above.' : ''}
+          No milestones or meetings yet.{info.isAdmin ? ' Add the first one above.' : ''}
         </ThemedText>
       )}
 
@@ -189,7 +221,17 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
                 </View>
                 <View style={styles.stepBody}>
                   <ThemedText type={status === 'now' ? 'bold' : 'default'}>{m.title}</ThemedText>
-                  {status === 'now' && (
+                  {isMeeting(m) && (
+                    <View style={styles.tools}>
+                      <Chip text={['Meeting', timeText(m)].filter(Boolean).join(' · ')} tone="lavender" icon="video" />
+                      {!!m.location && (
+                        <ThemedText type="small" themeColor="textSecondary" selectable>
+                          {m.location}
+                        </ThemedText>
+                      )}
+                    </View>
+                  )}
+                  {status === 'now' && !isMeeting(m) && (
                     <ThemedText type="smallBold" themeColor="primary">
                       In progress
                     </ThemedText>
@@ -205,7 +247,7 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
 
       {list.length > 0 && view === 'Timeline' && <Gantt list={list} onEdit={edit} />}
       {list.length > 0 && view === 'Calendar' && <MonthCalendar list={list} onEdit={edit} />}
-      {view !== 'List' && editing && editing !== 'new' && list.some((m) => m.id === editing) && (
+      {view !== 'List' && editing && editing !== 'new' && editing !== 'meeting' && list.some((m) => m.id === editing) && (
         <MilestoneForm
           info={info}
           place={place}
@@ -222,14 +264,20 @@ type FormProps = {
   info: SpaceInfo;
   place: SubgroupNode | null;
   milestone?: Milestone;
+  /** A new meeting instead of a new milestone. */
+  meeting?: boolean;
   onClose: () => void;
   onChanged: () => void;
 };
 
 const dotted = (value: string | null) => (value ? value.split('-').reverse().join('.') : '');
 
-function MilestoneForm({ info, place, milestone, onClose, onChanged }: FormProps) {
+function MilestoneForm({ info, place, milestone, meeting, onClose, onChanged }: FormProps) {
   const theme = useTheme();
+  const asMeeting = milestone ? isMeeting(milestone) : !!meeting;
+  const [from, setFrom] = useState(clock(milestone?.starts_at));
+  const [to, setTo] = useState(clock(milestone?.ends_at));
+  const [location, setLocation] = useState(milestone?.location ?? '');
   const [title, setTitle] = useState(milestone?.title ?? '');
   const [start, setStart] = useState(dotted(milestone?.start_date ?? null));
   const [due, setDue] = useState(dotted(milestone?.due_date ?? null));
@@ -251,7 +299,22 @@ function MilestoneForm({ info, place, milestone, onClose, onChanged }: FormProps
     const startDate = start.trim() ? parseDate(start) : null;
     const dueDate = due.trim() ? parseDate(due) : null;
     if ((start.trim() && !startDate) || (due.trim() && !dueDate)) return setError('Write dates like 03.12.2026.');
-    const values = { title: title.trim(), start_date: startDate, due_date: dueDate, done };
+    const fromTime = from.trim() ? parseTime(from) : null;
+    const toTime = to.trim() ? parseTime(to) : null;
+    if (asMeeting && ((from.trim() && !fromTime) || (to.trim() && !toTime))) return setError('Write times like 10:00.');
+    if (asMeeting && !dueDate) return setError('A meeting needs a day.');
+    const values = asMeeting
+      ? {
+          title: title.trim(),
+          start_date: null,
+          due_date: dueDate,
+          done,
+          kind: 'meeting',
+          starts_at: fromTime,
+          ends_at: toTime,
+          location: location.trim() || null,
+        }
+      : { title: title.trim(), start_date: startDate, due_date: dueDate, done };
     return run(
       milestone
         ? supabase.from('milestones').update(values).eq('id', milestone.id)
@@ -261,16 +324,41 @@ function MilestoneForm({ info, place, milestone, onClose, onChanged }: FormProps
 
   return (
     <View style={[styles.form, { backgroundColor: theme.background, borderColor: theme.border }]}>
-      <ThemedText type="bold">{milestone ? 'Edit milestone' : 'New milestone'}</ThemedText>
-      <Field label="What happens" required value={title} onChangeText={setTitle} />
-      <View style={styles.dates}>
-        <View style={styles.grow}>
-          <Field label="Starts (day.month.year)" value={start} onChangeText={setStart} placeholder="01.12.2026" />
+      <ThemedText type="bold">
+        {milestone ? 'Edit' : 'New'} {asMeeting ? 'meeting' : 'milestone'}
+      </ThemedText>
+      <Field label={asMeeting ? 'What the meeting is about' : 'What happens'} required value={title} onChangeText={setTitle} />
+      {asMeeting ? (
+        <>
+          <View style={styles.dates}>
+            <View style={styles.grow}>
+              <Field label="Day (day.month.year)" required value={due} onChangeText={setDue} placeholder="15.12.2026" />
+            </View>
+            <View style={styles.grow}>
+              <Field label="From" value={from} onChangeText={setFrom} placeholder="10:00" />
+            </View>
+            <View style={styles.grow}>
+              <Field label="To" value={to} onChangeText={setTo} placeholder="11:00" />
+            </View>
+          </View>
+          <Field
+            label="Place or meeting link"
+            value={location}
+            onChangeText={setLocation}
+            placeholder="Meeting room 2, or a Teams / Meet / Zoom link"
+            autoCapitalize="none"
+          />
+        </>
+      ) : (
+        <View style={styles.dates}>
+          <View style={styles.grow}>
+            <Field label="Starts (day.month.year)" value={start} onChangeText={setStart} placeholder="01.12.2026" />
+          </View>
+          <View style={styles.grow}>
+            <Field label="Ends or is due" value={due} onChangeText={setDue} placeholder="15.12.2026" />
+          </View>
         </View>
-        <View style={styles.grow}>
-          <Field label="Ends or is due" value={due} onChangeText={setDue} placeholder="15.12.2026" />
-        </View>
-      </View>
+      )}
       <View style={styles.tools}>
         <Tick checked={done} enabled={!busy} label="Done" onPress={() => setDone(!done)} />
         <ThemedText>Done</ThemedText>
@@ -346,7 +434,7 @@ function Gantt({ list, onEdit }: ViewProps) {
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                 {dateText(m) || 'No date'}
-                {status === 'done' ? ' · Done' : status === 'now' ? ' · In progress' : ''}
+                {isMeeting(m) ? ` · Meeting ${timeText(m)}` : status === 'done' ? ' · Done' : status === 'now' ? ' · In progress' : ''}
               </ThemedText>
             </View>
             <View style={styles.track}>
@@ -431,7 +519,7 @@ function MonthCalendar({ list, onEdit }: ViewProps) {
         <ThemedText type="heading">
           {MONTHS[index]} {year}
           <ThemedText type="small" themeColor="textSecondary">
-            {'  '}· {inMonth.length} milestone{inMonth.length === 1 ? '' : 's'}
+            {'  '}· {inMonth.length} item{inMonth.length === 1 ? '' : 's'}
           </ThemedText>
         </ThemedText>
         <IconButton icon="chevron-right" label="Next month" onPress={() => setMonth(new Date(year, index + 1, 1))} />
@@ -471,6 +559,7 @@ function MonthCalendar({ list, onEdit }: ViewProps) {
                         onPress={() => onEdit?.(x.m.id)}
                         style={[styles.event, { backgroundColor: ink(x.m) }]}>
                         <ThemedText type="small" numberOfLines={1} style={styles.eventText}>
+                          {isMeeting(x.m) && clock(x.m.starts_at) ? `${clock(x.m.starts_at)} ` : ''}
                           {x.m.title}
                         </ThemedText>
                       </Pressable>
@@ -482,14 +571,15 @@ function MonthCalendar({ list, onEdit }: ViewProps) {
       </View>
       {inMonth.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary">
-          No milestones this month.
+          Nothing this month.
         </ThemedText>
       )}
       {inMonth.map((x) => (
         <View key={x.m.id} style={styles.tools}>
-          <Chip text={dateText(x.m)} tone={tone(x.m)} />
+          <Chip text={[dateText(x.m), isMeeting(x.m) ? timeText(x.m) : ''].filter(Boolean).join(' · ')} tone={tone(x.m)} />
           <ThemedText type="bold" style={styles.grow}>
             {x.m.title}
+            {isMeeting(x.m) && x.m.location ? ` · ${x.m.location}` : ''}
           </ThemedText>
         </View>
       ))}

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, useWindow
 
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, Card, Chip, ErrorText, Field, Icon, IconButton, type IconName, TextButton } from '@/components/ui';
+import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, IconButton, type IconName, TextButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -12,7 +12,7 @@ import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
 
 type Person = {
   user_id: string;
-  role?: 'admin' | 'member';
+  role?: 'admin' | 'manager' | 'member';
   subgroup_id?: string;
   profile: { full_name: string; position: string | null; company_name: string | null } | null;
 };
@@ -273,6 +273,12 @@ function Toggle(props: { icon: IconName; label: string; on: boolean; disabled?: 
   );
 }
 
+const PLACE_ROLES = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'member', label: 'Staff' },
+] as const;
+
 type PeopleCardProps = {
   title: string;
   people: Person[];
@@ -294,6 +300,7 @@ function PeopleCard({ title, people, place, project, projectId, me, canManage, i
   const roleOf = new Map(project.map((p) => [p.user_id, p.role]));
   const canAdd = place ? project.filter((p) => !people.some((h) => h.user_id === p.user_id)) : [];
   const word = place?.parent_id ? 'team' : 'group';
+  const Word = word[0].toUpperCase() + word.slice(1);
 
   return (
     <View style={wide ? styles.half : styles.full}>
@@ -354,23 +361,23 @@ function PeopleCard({ title, people, place, project, projectId, me, canManage, i
                 </View>
                 {place ? (
                   canManage ? (
-                    <Button
-                      title={ownAdmin ? `${word[0].toUpperCase()}${word.slice(1)} admin` : `Make ${word} admin`}
-                      icon="shield"
-                      small
-                      variant={ownAdmin ? 'primary' : 'secondary'}
-                      onPress={() =>
+                    <Choices
+                      options={PLACE_ROLES}
+                      value={person.role ?? 'member'}
+                      onChange={(role) =>
                         run(
                           supabase
                             .from('subgroup_members')
-                            .update({ role: ownAdmin ? 'member' : 'admin' })
+                            .update({ role })
                             .eq('subgroup_id', place.id)
                             .eq('user_id', person.user_id),
                         )
                       }
                     />
                   ) : (
-                    (ownAdmin || projectAdmin) && <Chip text={ownAdmin ? `${word[0].toUpperCase()}${word.slice(1)} admin` : 'Admin'} />
+                    (ownAdmin || person.role === 'manager' || projectAdmin) && (
+                      <Chip text={ownAdmin ? `${Word} admin` : person.role === 'manager' ? 'Manager' : 'Admin'} />
+                    )
                   )
                 ) : isProjectAdmin && !isMe && canManage ? (
                   <Button
@@ -391,7 +398,18 @@ function PeopleCard({ title, people, place, project, projectId, me, canManage, i
                 ) : (
                   projectAdmin && <Chip text="Admin" />
                 )}
-                {canManage && (place || (isProjectAdmin && !isMe)) && removing !== person.user_id && (
+                {place && isMe && (
+                  <Button
+                    title={`Leave this ${word}`}
+                    icon="log-out"
+                    small
+                    variant="secondary"
+                    onPress={() =>
+                      run(supabase.from('subgroup_members').delete().eq('subgroup_id', place.id).eq('user_id', person.user_id))
+                    }
+                  />
+                )}
+                {canManage && !isMe && (place || isProjectAdmin) && removing !== person.user_id && (
                   <IconButton
                     icon="x"
                     label={`Remove ${person.profile?.full_name}`}

@@ -33,7 +33,7 @@ export type Profile = {
 
 export type Company = { id: string; name: string };
 
-export type CompanyRole = 'owner' | 'admin' | 'member' | 'guest';
+export type CompanyRole = 'owner' | 'admin' | 'manager' | 'member' | 'guest';
 
 export type Project = {
   id: string;
