@@ -3,6 +3,7 @@ import { StyleSheet, Text, type TextProps } from 'react-native';
 import { type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { capitals, trChildren } from '@/lib/i18n';
+import { currentLang } from '@/lib/prefs';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'bold' | 'title' | 'subtitle' | 'heading' | 'small' | 'smallBold' | 'link' | 'label' | 'number';
@@ -16,13 +17,15 @@ export function ThemedText({ style, type = 'default', themeColor, raw, children,
   const color = theme[themeColor ?? (type === 'link' ? 'primary' : type === 'label' ? 'textSecondary' : 'text')];
 
   return (
-    <Text style={[{ color }, styles[type], style]} {...rest}>
+    <Text style={[{ color }, styles[type], type === 'label' && currentLang() === 'tr' && styles.asWritten, style]} {...rest}>
       {raw ? children : type === 'label' ? capitals(trChildren(children)) : trChildren(children)}
     </Text>
   );
 }
 
 const styles = StyleSheet.create({
+  // Turkish labels are put in capitals by us (i to İ), so the phone must not do it again.
+  asWritten: { textTransform: 'none' },
   default: { fontFamily: Type.body, fontSize: 17, lineHeight: 25 },
   bold: { fontFamily: Type.bodyBold, fontSize: 17, lineHeight: 25 },
   title: { fontFamily: Type.headBold, fontSize: 30, lineHeight: 37, letterSpacing: -0.3 },
