@@ -264,6 +264,79 @@ export function Sidebar() {
   );
 }
 
+/** The closed menu on wide screens: a thin strip of icons that still shows what is there. */
+export function MiniRail({ onOpen }: { onOpen: () => void }) {
+  const theme = useTheme();
+  const { profile } = useAuth();
+  const { companies, projects, subgroups } = useWorkspace();
+  const pathname = usePathname();
+  const openGroup = subgroups.find((s) => pathname === `/group/${s.id}`);
+  const openParent = openGroup?.parent_id ?? openGroup?.id;
+  const activeProject = openGroup?.project_id ?? projects.find((p) => pathname === `/project/${p.id}`)?.id;
+
+  const box = (active: boolean) => [styles.miniBox, active && [styles.active, { backgroundColor: theme.card }]];
+
+  return (
+    <ScrollView style={{ backgroundColor: theme.rail }} contentContainerStyle={styles.mini}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Open menu" onPress={onOpen} style={styles.miniBox}>
+        <Icon name="menu" size={22} />
+      </Pressable>
+      <Link href="/" asChild>
+        <Pressable accessibilityRole="link" accessibilityLabel="All projects">
+          <View style={box(pathname === '/')}>
+            <Icon name="grid" size={22} color={pathname === '/' ? 'primary' : 'textSecondary'} />
+          </View>
+        </Pressable>
+      </Link>
+
+      {companies.map((company) => (
+        <View key={company.id} style={[styles.miniGroup, { borderTopColor: theme.border }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Open menu at ${company.name}`} onPress={onOpen}>
+            <View style={[styles.logo, { backgroundColor: theme.primary }]}>
+              <ThemedText style={{ color: theme.onPrimary, fontFamily: Type.headBold, fontSize: 17 }}>
+                {company.name.trim()[0]?.toUpperCase() ?? '?'}
+              </ThemedText>
+            </View>
+          </Pressable>
+          {projects
+            .filter((p) => p.company_id === company.id)
+            .map((project) => {
+              const active = project.id === activeProject;
+              const groups = subgroups.filter((s) => s.project_id === project.id && !s.parent_id);
+              return (
+                <View key={project.id} style={styles.miniProject}>
+                  <Link href={{ pathname: '/project/[id]', params: { id: project.id } }} asChild>
+                    <Pressable accessibilityRole="link" accessibilityLabel={project.name}>
+                      <View style={box(active && !openGroup)}>
+                        <Icon name="folder" size={22} color={active ? 'primary' : 'textSecondary'} />
+                      </View>
+                    </Pressable>
+                  </Link>
+                  {active &&
+                    groups.map((group) => (
+                      <Link key={group.id} href={{ pathname: '/group/[id]', params: { id: group.id } }} asChild>
+                        <Pressable accessibilityRole="link" accessibilityLabel={group.name}>
+                          <View style={[styles.miniMarkBox, openParent === group.id && { backgroundColor: theme.card }]}>
+                            <View style={[styles.mark, { backgroundColor: theme[markOf(subgroups, group)] }]} />
+                          </View>
+                        </Pressable>
+                      </Link>
+                    ))}
+                </View>
+              );
+            })}
+        </View>
+      ))}
+
+      <View style={[styles.miniGroup, { borderTopColor: theme.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open menu at your profile" onPress={onOpen}>
+          <Avatar name={profile?.full_name} />
+        </Pressable>
+      </View>
+    </ScrollView>
+  );
+}
+
 type RowProps = {
   href: React.ComponentProps<typeof Link>['href'];
   label: string;
@@ -341,6 +414,11 @@ const styles = StyleSheet.create({
   active: { boxShadow: '0 1px 4px rgba(120, 60, 30, 0.08)' },
   mark: { width: 14, height: 14, borderRadius: 4 },
   gap: { height: 8 },
+  mini: { alignItems: 'center', paddingVertical: 10, gap: 6, paddingBottom: Spacing.five },
+  miniBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  miniGroup: { alignItems: 'center', gap: 6, paddingTop: 10, marginTop: 4, borderTopWidth: 1, alignSelf: 'stretch' },
+  miniProject: { alignItems: 'center', gap: 2 },
+  miniMarkBox: { width: 34, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   you: { marginTop: Spacing.four, paddingTop: Spacing.three, paddingHorizontal: 12, borderTopWidth: 1, gap: Spacing.two },
   person: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

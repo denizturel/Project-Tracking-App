@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Sidebar } from '@/components/sidebar';
+import { MiniRail, Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -41,8 +41,8 @@ export default function AppLayout() {
           </View>
         )}
         {wide && !pinned && (
-          <View style={[styles.closedRail, { backgroundColor: theme.rail, borderRightColor: theme.border }]}>
-            <IconButton icon="menu" label="Open menu" onPress={() => setPinned(true)} />
+          <View style={[styles.closedRail, { borderRightColor: theme.border }]}>
+            <MiniRail onOpen={() => setPinned(true)} />
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -50,11 +50,25 @@ export default function AppLayout() {
             screenOptions={{
               // Wide screens have the side menu and each page's own title instead.
               headerShown: !wide,
-              headerStyle: { backgroundColor: theme.card },
-              headerTintColor: theme.text,
-              headerTitleStyle: { fontSize: 19, fontFamily: 'Sora_600SemiBold' },
               contentStyle: { backgroundColor: theme.background },
-              headerRight: () => <IconButton icon="menu" label="Open menu" onPress={() => setOpenOn(page)} />,
+              // Our own top bar on phones: buttons placed in the built-in iPhone bar do not show up.
+              header: ({ options, back, navigation }) => (
+                <View
+                  style={[
+                    styles.topBar,
+                    { paddingTop: insets.top + 6, backgroundColor: theme.card, borderBottomColor: theme.border },
+                  ]}>
+                  {back ? (
+                    <IconButton icon="chevron-left" label="Back" onPress={navigation.goBack} />
+                  ) : (
+                    <View style={styles.topBarSide} />
+                  )}
+                  <ThemedText type="heading" numberOfLines={1} style={styles.topBarTitle}>
+                    {options.title}
+                  </ThemedText>
+                  <IconButton icon="menu" label="Open menu" onPress={() => setOpenOn(page)} />
+                </View>
+              ),
             }}>
             <Stack.Screen name="index" options={{ title: 'Projects' }} />
             <Stack.Screen name="project/[id]" options={{ title: 'Project' }} />
@@ -93,7 +107,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderBottomWidth: 1,
   },
-  closedRail: { width: 60, alignItems: 'center', paddingTop: Spacing.three, borderRightWidth: 1 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+  },
+  topBarSide: { width: 40 },
+  topBarTitle: { flex: 1, textAlign: 'center' },
+  closedRail: { width: 64, borderRightWidth: 1 },
   drawerRow: { flex: 1, flexDirection: 'row' },
   drawer: { width: '84%', maxWidth: 340 },
   backdrop: { flex: 1, backgroundColor: 'rgba(60, 40, 30, 0.35)' },
