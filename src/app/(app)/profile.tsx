@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, ErrorText, Field } from '@/components/ui';
+import { cleanUsername, UsernameField } from '@/components/username-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
@@ -18,17 +19,20 @@ export default function ProfileScreen() {
   const [position, setPosition] = useState(profile?.position ?? '');
   const [department, setDepartment] = useState(profile?.department ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [username, setUsername] = useState(profile?.username ?? '');
+  const [usernameOk, setUsernameOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const changed =
     fullName.trim() !== (profile?.full_name ?? '') ||
+    cleanUsername(username) !== (profile?.username ?? '') ||
     company.trim() !== (profile?.company_name ?? '') ||
     position.trim() !== (profile?.position ?? '') ||
     department.trim() !== (profile?.department ?? '') ||
     phone.trim() !== (profile?.phone ?? '');
-  const canSave = changed && !!fullName.trim() && !!company.trim() && !!position.trim();
+  const canSave = changed && !!fullName.trim() && !!company.trim() && !!position.trim() && usernameOk;
 
   async function save() {
     if (!session) return;
@@ -39,13 +43,14 @@ export default function ProfileScreen() {
       .from('profiles')
       .update({
         full_name: fullName.trim(),
+        username: cleanUsername(username),
         company_name: company.trim(),
         position: position.trim(),
         department: department.trim() || null,
         phone: phone.trim() || null,
       })
       .eq('id', session.user.id);
-    if (failed) setError(failed.message);
+    if (failed) setError(failed.code === '23505' ? 'This username is taken. Try another one.' : failed.message);
     else {
       await refreshProfile();
       setSaved(true);
@@ -67,6 +72,11 @@ export default function ProfileScreen() {
             <ThemedText type="small" themeColor="textSecondary">
               {session?.user.email}
             </ThemedText>
+            {!!profile?.username && (
+              <ThemedText type="smallBold" themeColor="primary" raw selectable>
+                @{profile.username}
+              </ThemedText>
+            )}
           </View>
         </Card>
 
@@ -76,6 +86,7 @@ export default function ProfileScreen() {
             Teammates see these next to your name. Fields with * are required.
           </ThemedText>
           <Field label="Full name" required value={fullName} onChangeText={setFullName} autoComplete="name" />
+          <UsernameField value={username} onChangeText={setUsername} onValid={setUsernameOk} />
           <Field label="Company" required value={company} onChangeText={setCompany} autoComplete="organization" />
           <Field label="Position" required value={position} onChangeText={setPosition} autoComplete="organization-title" />
           <Field label="Department" value={department} onChangeText={setDepartment} />

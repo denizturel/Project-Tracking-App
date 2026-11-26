@@ -7,11 +7,12 @@ import { Avatar, Button, Card, Chip, ErrorText, Field, TextButton } from '@/comp
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { acceptConnection, askToConnect, type MyPerson, removeConnection, startChat, useMyPeople } from '@/lib/direct';
+import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { WIDE_SCREEN } from '@/lib/workspace';
 
-type Found = Pick<MyPerson, 'user_id' | 'full_name' | 'position' | 'company_name'>;
+type Found = Pick<MyPerson, 'user_id' | 'full_name' | 'position' | 'company_name'> & { username?: string | null };
 type Result = PromiseLike<{ error: { message: string } | null }>;
 
 /** Your connections: people you can message even without a shared project. */
@@ -23,7 +24,8 @@ export default function ConnectionsScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   // Removing takes two presses, so a slip does nothing.
   const [confirming, setConfirming] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
+  const { profile } = useAuth();
+  const [username, setUsername] = useState('');
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<Found | 'nobody' | null>(null);
 
@@ -47,7 +49,7 @@ export default function ConnectionsScreen() {
 
   async function find() {
     setSearching(true);
-    const result = await supabase.rpc('find_person_by_email', { mail: email });
+    const result = await supabase.rpc('find_person_by_username', { name: username });
     setSearching(false);
     setFailed(result.error?.message ?? null);
     setFound(((result.data as Found[] | null) ?? [])[0] ?? 'nobody');
@@ -59,6 +61,7 @@ export default function ConnectionsScreen() {
       <View style={styles.name}>
         <ThemedText type="bold" raw numberOfLines={1}>
           {person.full_name}
+          {!!(person as Found).username && <ThemedText themeColor="textSecondary" raw>{`  @${(person as Found).username}`}</ThemedText>}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
           {jobText(person.position, person.company_name)}
@@ -133,23 +136,31 @@ export default function ConnectionsScreen() {
         <Card tint="sky">
           <ThemedText type="subtitle">Add a connection</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Type the email address the person uses in Doneva. They get a request and can accept it.
+            Type the person&apos;s username. They get a request and can accept it.
           </ThemedText>
+          {!!profile?.username && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Your own username, to give to others:{' '}
+              <ThemedText type="smallBold" themeColor="primary" raw selectable>
+                @{profile.username}
+              </ThemedText>
+            </ThemedText>
+          )}
           <Field
-            label="Their email"
-            value={email}
+            label="Their username"
+            value={username}
             onChangeText={(text) => {
-              setEmail(text);
+              setUsername(text.replace(/\s/g, ''));
               setFound(null);
             }}
             autoCapitalize="none"
             autoCorrect={false}
-            keyboardType="email-address"
+            onSubmitEditing={find}
           />
-          <Button title="Find" icon="search" variant="secondary" onPress={find} loading={searching} disabled={!/^\S+@\S+\.\S+$/.test(email.trim())} />
+          <Button title="Find" icon="search" variant="secondary" onPress={find} loading={searching} disabled={username.replace(/^@+/, '').length < 3} />
           {found === 'nobody' && (
             <ThemedText type="small" themeColor="textSecondary">
-              Nobody uses Doneva with this email address.
+              Nobody has this username.
             </ThemedText>
           )}
           {found &&

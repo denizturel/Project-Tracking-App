@@ -50,8 +50,8 @@ function RootNavigator() {
   if (waiting) return null;
 
   const signedIn = !!session;
-  // Company and position are required before anyone can continue (decided by Deniz).
-  const ready = signedIn && !!profile?.profile_complete;
+  // Company, position and a username are required before anyone can continue (decided by Deniz).
+  const ready = signedIn && !!profile?.profile_complete && !!profile.username;
 
   return (
     <>

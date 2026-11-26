@@ -29,6 +29,8 @@ export type Profile = {
   department: string | null;
   phone: string | null;
   profile_complete: boolean;
+  /** Unique name others use to find and connect with this person. Empty until they pick one. */
+  username: string | null;
 };
 
 export type Company = { id: string; name: string };

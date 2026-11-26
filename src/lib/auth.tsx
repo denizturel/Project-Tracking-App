@@ -29,7 +29,7 @@ export function useAuth() {
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('id, full_name, avatar_url, company_name, position, department, phone, profile_complete')
+    .select('id, full_name, avatar_url, company_name, position, department, phone, profile_complete, username')
     .eq('id', userId)
     .maybeSingle();
   return data;

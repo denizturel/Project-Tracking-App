@@ -19,7 +19,7 @@ type Person = {
   user_id: string;
   role?: 'admin' | 'manager' | 'member';
   subgroup_id?: string;
-  profile: { full_name: string; position: string | null; company_name: string | null } | null;
+  profile: { full_name: string; position: string | null; company_name: string | null; username?: string | null } | null;
 };
 
 type Invitation = { id: string; email: string; token: string; project_role: 'admin' | 'member' };
@@ -33,7 +33,7 @@ type Loaded = {
   error: string | null;
 };
 
-const PROFILE = 'profile:profiles!user_id(full_name, position, company_name)';
+const PROFILE = 'profile:profiles!user_id(full_name, position, company_name, username)';
 
 async function fetchPeople(info: SpaceInfo, subgroupIds: string[]): Promise<Loaded> {
   const [project, placed, invitations] = await Promise.all([
@@ -364,6 +364,11 @@ function ProfileCard(props: ProfileCardProps) {
               {person.profile?.full_name ?? 'Unknown'}
               {isMe && <ThemedText themeColor="textSecondary"> (you)</ThemedText>}
             </ThemedText>
+            {!!person.profile?.username && (
+              <ThemedText type="small" themeColor="textSecondary" raw selectable>
+                @{person.profile.username}
+              </ThemedText>
+            )}
           </View>
 
           <View style={styles.cardLine}>

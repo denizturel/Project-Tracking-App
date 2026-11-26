@@ -3,12 +3,13 @@ import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, ErrorText, Field, Screen } from '@/components/ui';
+import { cleanUsername, UsernameField } from '@/components/username-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 /**
- * Shown after sign-in (including Google) until company and position are filled in.
+ * Shown after sign-in (including Google) until company, position and a username are filled in.
  * The typed company is profile text only; access comes from memberships.
  */
 export default function WorkDetailsScreen() {
@@ -18,10 +19,12 @@ export default function WorkDetailsScreen() {
   const [position, setPosition] = useState(profile?.position ?? '');
   const [department, setDepartment] = useState(profile?.department ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [username, setUsername] = useState(profile?.username ?? '');
+  const [usernameOk, setUsernameOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSave = !!fullName.trim() && !!company.trim() && !!position.trim();
+  const canSave = !!fullName.trim() && !!company.trim() && !!position.trim() && usernameOk;
 
   async function save() {
     if (!session) return;
@@ -31,13 +34,14 @@ export default function WorkDetailsScreen() {
       .from('profiles')
       .update({
         full_name: fullName.trim(),
+        username: cleanUsername(username),
         company_name: company.trim(),
         position: position.trim(),
         department: department.trim() || null,
         phone: phone.trim() || null,
       })
       .eq('id', session.user.id);
-    if (failed) setError(failed.message);
+    if (failed) setError(failed.code === '23505' ? 'This username is taken. Try another one.' : failed.message);
     else await refreshProfile();
     setBusy(false);
   }
@@ -53,6 +57,7 @@ export default function WorkDetailsScreen() {
 
       <Card>
         <Field label="Full name" required value={fullName} onChangeText={setFullName} autoComplete="name" />
+        <UsernameField value={username} onChangeText={setUsername} onValid={setUsernameOk} />
         <Field label="Company" required value={company} onChangeText={setCompany} autoComplete="organization" />
         <Field
           label="Position"

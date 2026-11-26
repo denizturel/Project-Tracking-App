@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, ErrorText, Field, Screen, Choices } from '@/components/ui';
+import { cleanUsername, UsernameField } from '@/components/username-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { setLang, usePrefs } from '@/lib/prefs';
@@ -18,6 +19,8 @@ export default function SignInScreen() {
   const { signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameOk, setUsernameOk] = useState(false);
   const [company, setCompany] = useState('');
   const [position, setPosition] = useState('');
   const [department, setDepartment] = useState('');
@@ -30,7 +33,7 @@ export default function SignInScreen() {
 
   const creating = mode === 'sign-up';
   // Company and position are required to create an account (decided by Deniz).
-  const detailsFilled = fullName.trim().length > 1 && !!company.trim() && !!position.trim();
+  const detailsFilled = fullName.trim().length > 1 && !!company.trim() && !!position.trim() && usernameOk;
   const canSubmit = email.trim().length > 3 && password.length >= 6 && (!creating || detailsFilled);
 
   async function submit() {
@@ -44,6 +47,7 @@ export default function SignInScreen() {
         options: {
           data: {
             full_name: fullName.trim(),
+            username: cleanUsername(username),
             company_name: company.trim(),
             position: position.trim(),
             department: department.trim(),
@@ -105,6 +109,7 @@ export default function SignInScreen() {
             textContentType="name"
           />
         )}
+        {creating && <UsernameField value={username} onChangeText={setUsername} onValid={setUsernameOk} />}
         {creating && (
           <Field
             label="Company"
