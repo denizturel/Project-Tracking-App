@@ -29,7 +29,7 @@ type Message = {
   editor: { full_name: string } | null;
 };
 
-type Loaded = { conversationId: string | null; messages: Message[]; error: string | null };
+type Loaded = { conversationId: string | null; messages: Message[]; error: string | null; loadedAt: number };
 
 async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined): Promise<Loaded> {
   const conversations = supabase.from('conversations').select('id');
@@ -40,7 +40,7 @@ async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined
       : conversations.eq('kind', 'project').eq('project_id', info?.project.id)
   ).maybeSingle();
   if (found.error || !found.data) {
-    return { conversationId: null, messages: [], error: found.error?.message ?? 'This chat could not be found.' };
+    return { conversationId: null, messages: [], error: found.error?.message ?? 'This chat could not be found.', loadedAt: Date.now() };
   }
   // Opening a private chat marks it as read.
   if (direct) {
@@ -67,6 +67,7 @@ async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined
     conversationId: found.data.id,
     messages: ((messages.data ?? []) as unknown as Message[]).reverse(),
     error: messages.error?.message ?? null,
+    loadedAt: Date.now(),
   };
 }
 
@@ -167,9 +168,13 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
             No messages yet. Say hello.
           </ThemedText>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const mine = item.sender_id === userId;
           const deleted = !!item.deleted_at;
+          // Your own message can be changed for 24 hours, and only until someone else writes after it.
+          const open =
+            data.loadedAt - new Date(item.created_at).getTime() < 24 * 3600 * 1000 &&
+            !data.messages.slice(index + 1).some((later) => later.sender_id !== item.sender_id);
           return (
             <View style={[styles.row, mine && styles.rowMine]}>
               {!mine && <Avatar name={item.sender?.full_name} size={36} />}
@@ -190,7 +195,7 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
                 </ThemedText>
                 {!deleted && <EditedLabel name={item.editor?.full_name ?? null} at={item.edited_at} />}
                 <View style={styles.meta}>
-                  {!deleted && (mine || info?.isAdmin) && (
+                  {!deleted && ((mine && open) || info?.isAdmin) && (
                     <>
                       <TextButton
                         title="Edit"
