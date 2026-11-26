@@ -12,7 +12,7 @@ import { useWorkspace } from '@/lib/workspace';
 
 const MARKS: ThemeColor[] = ['lavender', 'mint', 'sky', 'butter'];
 
-/** Folding tree: Projects > each project > its groups > their teams, then "You". */
+/** Folding tree: Projects > each company > its projects > its groups > their teams, then "You". */
 export function Sidebar() {
   const theme = useTheme();
   const { profile, signOut } = useAuth();
@@ -23,6 +23,7 @@ export function Sidebar() {
 
   const toggle = (id: string) => setFolded((f) => ({ ...f, [id]: !f[id] }));
   const foldable = [
+    ...companies.map((c) => c.id),
     ...projects.map((p) => p.id),
     ...subgroups.filter((s) => !s.parent_id).map((s) => s.id),
   ];
@@ -46,7 +47,7 @@ export function Sidebar() {
         </View>
       </View>
 
-      {!loading && projects.length === 0 && (
+      {!loading && companies.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
           No projects yet. Create one from Home.
         </ThemedText>
@@ -54,15 +55,29 @@ export function Sidebar() {
 
       {companies.map((company) => {
         const mine = projects.filter((p) => p.company_id === company.id);
-        if (mine.length === 0) return null;
+        const closed = !!folded[company.id];
         return (
           <View key={company.id} style={styles.company}>
-            {companies.length > 1 && (
-              <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={closed ? `Expand ${company.name}` : `Collapse ${company.name}`}
+              onPress={() => toggle(company.id)}
+              style={({ pressed }) => [
+                styles.companyHeader,
+                { backgroundColor: pressed ? theme.backgroundSelected : theme.card },
+              ]}
+            >
+              <ThemedText themeColor="textSecondary">{closed ? '▸' : '▾'}</ThemedText>
+              <ThemedText type="bold" numberOfLines={1} style={styles.label}>
                 {company.name}
               </ThemedText>
+            </Pressable>
+            {!closed && mine.length === 0 && (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
+                No projects here yet. Create one from Home.
+              </ThemedText>
             )}
-            {mine.map((project) => {
+            {(closed ? [] : mine).map((project) => {
               const groups = subgroups.filter((s) => s.project_id === project.id && !s.parent_id);
               return (
                 <View key={project.id}>
@@ -195,8 +210,16 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.three, gap: Spacing.one },
   sectionHeader: { marginTop: Spacing.three, gap: Spacing.one },
   actions: { flexDirection: 'row', gap: Spacing.three },
-  company: { gap: Spacing.one },
-  note: { paddingVertical: Spacing.one },
+  company: { gap: Spacing.one, marginTop: Spacing.two },
+  companyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 46,
+    paddingHorizontal: Spacing.two,
+    borderRadius: 12,
+  },
+  note: { paddingVertical: Spacing.one, paddingHorizontal: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 46 },
   guide: { width: 2, alignSelf: 'stretch', marginRight: Spacing.one, borderRadius: 1 },
   chevron: { width: 26, alignItems: 'center', justifyContent: 'center' },
