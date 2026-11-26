@@ -1,7 +1,15 @@
 import { type Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { createContext, type ReactNode, use, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { type Profile, supabase } from '@/lib/supabase';
@@ -29,7 +37,9 @@ export function useAuth() {
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('id, full_name, avatar_url, company_name, position, department, phone, profile_complete')
+    .select(
+      'id, full_name, avatar_url, company_name, position, department, phone, profile_complete',
+    )
     .eq('id', userId)
     .maybeSingle();
   return data;
@@ -65,6 +75,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (state === 'active') supabase.auth.startAutoRefresh();
       else supabase.auth.stopAutoRefresh();
     });
+    return () => sub.remove();
+  }, []);
+
+  // Phones: a sign-in link from an email opens the app with a one-time code in the address.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const finish = (url: string | null) => {
+      const code = url ? Linking.parse(url).queryParams?.code : null;
+      if (typeof code === 'string') supabase.auth.exchangeCodeForSession(code).catch(() => {});
+    };
+    Linking.getInitialURL().then(finish);
+    const sub = Linking.addEventListener('url', (event) => finish(event.url));
     return () => sub.remove();
   }, []);
 
@@ -104,7 +126,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ loading, session, profile, refreshProfile, signInWithGoogle, signOut }),
+    () => ({
+      loading,
+      session,
+      profile,
+      refreshProfile,
+      signInWithGoogle,
+      signOut,
+    }),
     [loading, session, profile, refreshProfile, signInWithGoogle, signOut],
   );
 

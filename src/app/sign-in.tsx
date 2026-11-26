@@ -1,83 +1,77 @@
-import { useState } from "react";
-import { View } from "react-native";
+import { useState } from 'react';
+import * as Linking from 'expo-linking';
+import { Platform, View } from 'react-native';
 
-import { ThemedText } from "@/components/themed-text";
-import { Button, Card, ErrorText, Field, Screen } from "@/components/ui";
-import { Spacing } from "@/constants/theme";
-import { useAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { ThemedText } from '@/components/themed-text';
+import { Button, Card, ErrorText, Field, Screen } from '@/components/ui';
+import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 export default function SignInScreen() {
   const { signInWithGoogle } = useAuth();
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
-  const [fullName, setFullName] = useState("");
-  const [company, setCompany] = useState("");
-  const [position, setPosition] = useState("");
-  const [department, setDepartment] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  // Sign-in with a one-time code sent by email, for accounts that already exist.
+  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [fullName, setFullName] = useState('');
+  const [company, setCompany] = useState('');
+  const [position, setPosition] = useState('');
+  const [department, setDepartment] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  // Sign-in with a one-time link sent by email, for accounts that already exist.
   const [useCode, setUseCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState<"email" | "google" | null>(null);
+  const [busy, setBusy] = useState<'email' | 'google' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const creating = mode === "sign-up";
+  const creating = mode === 'sign-up';
   // Company and position are required to create an account (decided by Deniz).
-  const detailsFilled =
-    fullName.trim().length > 1 && !!company.trim() && !!position.trim();
+  const detailsFilled = fullName.trim().length > 1 && !!company.trim() && !!position.trim();
   const withCode = useCode && !creating;
   const emailFilled = email.trim().length > 3;
   const canSubmit = withCode
-    ? emailFilled && (!codeSent || code.trim().length >= 6)
+    ? emailFilled && !codeSent
     : emailFilled && password.length >= 6 && (!creating || detailsFilled);
 
+  // The email holds a sign-in link. A typed 6-digit code needs our own email
+  // service in Supabase first (its built-in sender does not allow changing the email).
   async function submitCode() {
-    setBusy("email");
+    setBusy('email');
     setError(null);
     setNotice(null);
-    if (!codeSent) {
-      const { error: failed } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { shouldCreateUser: false },
-      });
-      if (failed) {
-        setError(
-          /signups not allowed/i.test(failed.message)
-            ? "There is no account with this email yet. Create an account first."
-            : failed.message,
-        );
-      } else {
-        setCodeSent(true);
-        setNotice("We sent a code to your email. Type it below.");
-      }
+    const { error: failed } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo:
+          Platform.OS === 'web' ? window.location.origin : Linking.createURL('sign-in'),
+      },
+    });
+    if (failed) {
+      setError(
+        /signups not allowed/i.test(failed.message)
+          ? 'There is no account with this email yet. Create an account first.'
+          : failed.message,
+      );
     } else {
-      const { error: failed } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: code.trim(),
-        type: "email",
-      });
-      if (failed)
-        setError(
-          "That code is wrong or has expired. Check it or ask for a new one.",
-        );
+      setCodeSent(true);
+      setNotice(
+        'We sent a sign-in link to your email. Open it on this device, in this same browser, and you are signed in.',
+      );
     }
     setBusy(null);
   }
 
   function resetCode() {
     setCodeSent(false);
-    setCode("");
     setError(null);
     setNotice(null);
   }
 
   async function submit() {
     if (withCode) return submitCode();
-    setBusy("email");
+    setBusy('email');
     setError(null);
     setNotice(null);
     const credentials = { email: email.trim(), password };
@@ -96,21 +90,18 @@ export default function SignInScreen() {
       });
       if (failed) setError(failed.message);
       else if (!data.session) {
-        setNotice(
-          "Check your email and open the confirmation link, then sign in here.",
-        );
-        setMode("sign-in");
+        setNotice('Check your email and open the confirmation link, then sign in here.');
+        setMode('sign-in');
       }
     } else {
-      const { error: failed } =
-        await supabase.auth.signInWithPassword(credentials);
+      const { error: failed } = await supabase.auth.signInWithPassword(credentials);
       if (failed) setError(failed.message);
     }
     setBusy(null);
   }
 
   async function google() {
-    setBusy("google");
+    setBusy('google');
     setError(null);
     setError(await signInWithGoogle());
     setBusy(null);
@@ -126,23 +117,17 @@ export default function SignInScreen() {
       </View>
 
       <Card>
-        <ThemedText type="subtitle">
-          {creating ? "Create your account" : "Sign in"}
-        </ThemedText>
+        <ThemedText type="subtitle">{creating ? 'Create your account' : 'Sign in'}</ThemedText>
 
         <Button
           title="Continue with Google"
           variant="secondary"
           onPress={google}
-          loading={busy === "google"}
+          loading={busy === 'google'}
           disabled={busy !== null}
         />
 
-        <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          style={{ textAlign: "center" }}
-        >
+        <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
           or use your email
         </ThemedText>
 
@@ -176,13 +161,7 @@ export default function SignInScreen() {
             textContentType="jobTitle"
           />
         )}
-        {creating && (
-          <Field
-            label="Department"
-            value={department}
-            onChangeText={setDepartment}
-          />
-        )}
+        {creating && <Field label="Department" value={department} onChangeText={setDepartment} />}
         {creating && (
           <Field
             label="Phone"
@@ -213,28 +192,15 @@ export default function SignInScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            autoComplete={creating ? "new-password" : "current-password"}
-            textContentType={creating ? "newPassword" : "password"}
+            autoComplete={creating ? 'new-password' : 'current-password'}
+            textContentType={creating ? 'newPassword' : 'password'}
             onSubmitEditing={() => canSubmit && submit()}
           />
         )}
-        {withCode && codeSent && (
-          <Field
-            label="Code from the email"
-            required
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-            textContentType="oneTimeCode"
-            onSubmitEditing={() => canSubmit && submit()}
-          />
-        )}
-
         {creating && (
           <ThemedText type="small" themeColor="textSecondary">
-            Fields with * are required. With Google, you fill in company and
-            position on the next screen.
+            Fields with * are required. With Google, you fill in company and position on the next
+            screen.
           </ThemedText>
         )}
 
@@ -243,19 +209,15 @@ export default function SignInScreen() {
 
         <Button
           title={
-            creating
-              ? "Create account"
-              : withCode && !codeSent
-                ? "Email me a code"
-                : "Sign in"
+            creating ? 'Create account' : withCode && !codeSent ? 'Email me a code' : 'Sign in'
           }
           onPress={submit}
-          loading={busy === "email"}
+          loading={busy === 'email'}
           disabled={!canSubmit || busy !== null}
         />
         {withCode && codeSent && (
           <Button
-            title="Send a new code"
+            title="Send a new link"
             variant="plain"
             onPress={resetCode}
             disabled={busy !== null}
@@ -263,11 +225,7 @@ export default function SignInScreen() {
         )}
         {!creating && (
           <Button
-            title={
-              useCode
-                ? "Use my password instead"
-                : "Sign in with a code by email"
-            }
+            title={useCode ? 'Use my password instead' : 'Sign in with a code by email'}
             variant="plain"
             onPress={() => {
               setUseCode(!useCode);
@@ -277,12 +235,10 @@ export default function SignInScreen() {
           />
         )}
         <Button
-          title={
-            creating ? "I already have an account" : "Create a new account"
-          }
+          title={creating ? 'I already have an account' : 'Create a new account'}
           variant="plain"
           onPress={() => {
-            setMode(creating ? "sign-in" : "sign-up");
+            setMode(creating ? 'sign-in' : 'sign-up');
             setError(null);
           }}
           disabled={busy !== null}
