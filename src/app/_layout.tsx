@@ -6,7 +6,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { Fragment, useEffect } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 
 import { LockScreen } from '@/components/lock-screen';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
@@ -53,11 +53,14 @@ function RootNavigator() {
     SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
   }, [theme.background]);
   const base = dark ? DarkTheme : DefaultTheme;
-  const navigationTheme = {
-    ...base,
-    dark,
-    colors: { ...base.colors, background: theme.background, card: theme.card, text: theme.text, border: theme.border, primary: theme.primary },
-  };
+  const navigationTheme = useMemo(
+    () => ({
+      ...base,
+      dark,
+      colors: { ...base.colors, background: theme.background, card: theme.card, text: theme.text, border: theme.border, primary: theme.primary },
+    }),
+    [base, dark, theme.background, theme.card, theme.text, theme.border, theme.primary],
+  );
 
   if (waiting) return null;
 
@@ -96,7 +99,7 @@ function Screens({
         headerTintColor: theme.text,
         headerTitleStyle: { fontSize: 20, fontFamily: 'Sora_600SemiBold' },
         contentStyle: { backgroundColor: theme.background },
-        animation: 'fade',
+        animation: 'none',
       }}
     >
       <Stack.Protected guard={!signedIn}>

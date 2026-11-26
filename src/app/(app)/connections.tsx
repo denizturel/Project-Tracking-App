@@ -59,7 +59,13 @@ export default function ConnectionsScreen() {
     setSearching(true);
     const result = await supabase.rpc('find_person_by_username', { name: username });
     setSearching(false);
-    setFailed(result.error?.message ?? null);
+    if (result.error) {
+      // "Nobody found" would be wrong here: the search itself did not run.
+      setFailed(result.error.message.includes('permission denied') ? 'Please sign in again and try once more.' : result.error.message);
+      setFound(null);
+      return;
+    }
+    setFailed(null);
     setFound(((result.data as Found[] | null) ?? [])[0] ?? 'nobody');
   }
 

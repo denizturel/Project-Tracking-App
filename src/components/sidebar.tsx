@@ -38,8 +38,8 @@ export function Sidebar() {
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ tab?: string }>();
-  // Unread private messages; counted again whenever the page changes.
-  const { unread } = useDirectChats(pathname);
+  // Unread private messages; counted again when a chat is opened or left (new messages arrive by themselves).
+  const { unread } = useDirectChats(pathname.startsWith('/messages') ? pathname : '');
 
   const toggle = (id: string) => setFolded((f) => ({ ...f, [id]: !f[id] }));
   const foldable = [
@@ -267,7 +267,7 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
   const { profile } = useAuth();
   const { companies, projects, subgroups } = useWorkspace();
   const pathname = usePathname();
-  const { unread } = useDirectChats(pathname);
+  const { unread } = useDirectChats(pathname.startsWith('/messages') ? pathname : '');
   const openGroup = subgroups.find((s) => pathname === `/group/${s.id}`);
   const openParent = openGroup?.parent_id ?? openGroup?.id;
   const activeProject = openGroup?.project_id ?? projects.find((p) => pathname === `/project/${p.id}`)?.id;

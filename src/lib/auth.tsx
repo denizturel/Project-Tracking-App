@@ -1,7 +1,7 @@
 import { type Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { createContext, type ReactNode, use, useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, type ReactNode, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { type Profile, supabase } from '@/lib/supabase';
@@ -40,14 +40,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
+  const shownUser = useRef<string | null>(null);
+
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next);
+      // The same person again (a renewed sign-in, or coming back to the browser tab) must not redraw every page.
+      const samePerson = !!next && shownUser.current === next.user.id;
+      shownUser.current = next?.user.id ?? null;
+      if (!samePerson) setSession(next);
       if (!next) {
         setProfile(null);
         setLoading(false);
         return;
       }
+      if (samePerson) return;
       // Deferred: Supabase calls must not run inside this callback.
       setTimeout(async () => {
         setProfile(await fetchProfile(next.user.id));
@@ -100,7 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    // Only this device: signing out here must not throw the same person out of their other devices.
+    await supabase.auth.signOut({ scope: 'local' });
   }, []);
 
   const value = useMemo(

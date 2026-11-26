@@ -52,9 +52,8 @@ export default function AppLayout() {
               headerShown: !wide,
               statusBarStyle: dark ? 'light' : 'dark',
               contentStyle: { backgroundColor: theme.background },
-              // Pages fade into each other; a sliding page showed an empty strip while the next one loaded.
-              animation: 'fade',
-              animationDuration: 160,
+              // Pages change at once: a slide showed an empty strip while the next page loaded, and a fade felt slow.
+              animation: 'none',
               // Our own top bar on phones: buttons placed in the built-in iPhone bar do not show up.
               header: ({ options, back, navigation }) => (
                 <View
