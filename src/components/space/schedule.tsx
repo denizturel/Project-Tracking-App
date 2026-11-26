@@ -25,6 +25,8 @@ export type Milestone = {
   starts_at?: string | null;
   ends_at?: string | null;
   location?: string | null;
+  notes?: string | null;
+  decisions?: string | null;
 };
 
 export const SCHEDULE_VIEWS = ['List', 'Timeline', 'Calendar'] as const;
@@ -84,9 +86,11 @@ export function useMilestones(projectId: string) {
         .eq('project_id', projectId)
         .order('due_date', { ascending: true, nullsFirst: false })
         .returns<Milestone[]>();
-    const full = await load(`${BASE}, kind, starts_at, ends_at, location`);
-    // Before the meeting columns exist in the database, the schedule still works with milestones only.
-    return full.error ? load(BASE) : full;
+    // Older databases lack the meeting columns; the schedule then still works with what is there.
+    const full = await load(`${BASE}, kind, starts_at, ends_at, location, notes, decisions`);
+    if (!full.error) return full;
+    const meetings = await load(`${BASE}, kind, starts_at, ends_at, location`);
+    return meetings.error ? load(BASE) : meetings;
   });
 }
 
@@ -147,7 +151,9 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
   const percent = percentAlong(list);
   // 'new', a milestone's id, or nothing open.
   const [editing, setEditing] = useState<string | null>(null);
-  const edit = info.isAdmin ? setEditing : undefined;
+  // A manager changes the schedule of their own group or team only.
+  const canEdit = info.isFullAdmin || (info.isAdmin && place?.id === info.subgroup?.id);
+  const edit = canEdit ? setEditing : undefined;
 
   return (
     <Card>
@@ -156,10 +162,10 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
         <Segmented options={SCHEDULE_VIEWS} value={view} onChange={onView} />
       </View>
       <View style={styles.tools}>
-        {info.isAdmin && (
+        {canEdit && (
           <Button title="Add milestone" icon="plus" variant="secondary" small onPress={() => setEditing('new')} />
         )}
-        {info.isAdmin && (
+        {canEdit && (
           <Button title="Add meeting" icon="video" variant="secondary" small onPress={() => setEditing('meeting')} />
         )}
         <ThemedText type="small" themeColor="textSecondary">
@@ -182,7 +188,7 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
 
       {list.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary">
-          No milestones or meetings yet.{info.isAdmin ? ' Add the first one above.' : ''}
+          No milestones or meetings yet.{canEdit ? ' Add the first one above.' : ''}
         </ThemedText>
       )}
 
@@ -231,6 +237,27 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
                       )}
                     </View>
                   )}
+                  {isMeeting(m) && (!!m.notes || !!m.decisions) && (
+                    <View style={[styles.minutes, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                      {!!m.notes && (
+                        <View style={{ gap: 2 }}>
+                          <ThemedText type="label">Meeting notes</ThemedText>
+                          <ThemedText>{m.notes}</ThemedText>
+                        </View>
+                      )}
+                      {!!m.decisions && (
+                        <View style={{ gap: 2 }}>
+                          <ThemedText type="label">Decisions taken</ThemedText>
+                          <ThemedText>{m.decisions}</ThemedText>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                  {isMeeting(m) && !m.notes && !m.decisions && statusOf(m) === 'done' && (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      No notes or decisions written yet.
+                    </ThemedText>
+                  )}
                   {status === 'now' && !isMeeting(m) && (
                     <ThemedText type="smallBold" themeColor="primary">
                       In progress
@@ -278,6 +305,8 @@ function MilestoneForm({ info, place, milestone, meeting, onClose, onChanged }: 
   const [from, setFrom] = useState(clock(milestone?.starts_at));
   const [to, setTo] = useState(clock(milestone?.ends_at));
   const [location, setLocation] = useState(milestone?.location ?? '');
+  const [notes, setNotes] = useState(milestone?.notes ?? '');
+  const [decisions, setDecisions] = useState(milestone?.decisions ?? '');
   const [title, setTitle] = useState(milestone?.title ?? '');
   const [start, setStart] = useState(dotted(milestone?.start_date ?? null));
   const [due, setDue] = useState(dotted(milestone?.due_date ?? null));
@@ -313,6 +342,8 @@ function MilestoneForm({ info, place, milestone, meeting, onClose, onChanged }: 
           starts_at: fromTime,
           ends_at: toTime,
           location: location.trim() || null,
+          notes: notes.trim() || null,
+          decisions: decisions.trim() || null,
         }
       : { title: title.trim(), start_date: startDate, due_date: dueDate, done };
     return run(
@@ -347,6 +378,20 @@ function MilestoneForm({ info, place, milestone, meeting, onClose, onChanged }: 
             onChangeText={setLocation}
             placeholder="Meeting room 2, or a Teams / Meet / Zoom link"
             autoCapitalize="none"
+          />
+          <Field
+            label="Meeting notes"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="What was discussed. You can fill this in after the meeting."
+            multiline
+          />
+          <Field
+            label="Decisions taken"
+            value={decisions}
+            onChangeText={setDecisions}
+            placeholder="One decision per line"
+            multiline
           />
         </>
       ) : (
@@ -599,6 +644,7 @@ const styles = StyleSheet.create({
   node: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, marginTop: 7 },
   wire: { width: 2, flex: 1, marginTop: 2 },
   stepBody: { flex: 1, minWidth: 0, paddingBottom: 14, gap: 2 },
+  minutes: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 10, marginTop: 6 },
   form: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 12, marginVertical: 6 },
   dates: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   gantt: { gap: 0 },

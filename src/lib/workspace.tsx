@@ -13,6 +13,8 @@ type Tree = {
   subgroups: SubgroupNode[];
   /** Groups and teams where the signed-in person is that group's or team's own admin. */
   adminSubgroups: string[];
+  /** Groups and teams where the person is a manager: admin rights for that one place only. */
+  managerSubgroups: string[];
 };
 
 type WorkspaceValue = Tree & {
@@ -22,7 +24,7 @@ type WorkspaceValue = Tree & {
   reload: () => void;
 };
 
-const empty: Tree = { companies: [], projects: [], subgroups: [], adminSubgroups: [] };
+const empty: Tree = { companies: [], projects: [], subgroups: [], adminSubgroups: [], managerSubgroups: [] };
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 export function useWorkspace() {
@@ -51,7 +53,7 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
         'id, project_id, parent_id, name, description, color, edited_at, editor:profiles!edited_by(full_name)',
       )
       .order('name'),
-    supabase.from('subgroup_members').select('subgroup_id').eq('user_id', userId).eq('role', 'admin'),
+    supabase.from('subgroup_members').select('subgroup_id, role').eq('user_id', userId).in('role', ['admin', 'manager']),
   ]);
   const failed =
     memberships.error ?? projects.error ?? roles.error ?? subgroups.error ?? ownGroups.error;
@@ -70,7 +72,10 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
     error: null,
     tree: {
       companies,
-      adminSubgroups: (ownGroups.data ?? []).map((row) => row.subgroup_id as string),
+      adminSubgroups: (ownGroups.data ?? []).filter((row) => row.role === 'admin').map((row) => row.subgroup_id as string),
+      managerSubgroups: (ownGroups.data ?? [])
+        .filter((row) => row.role === 'manager')
+        .map((row) => row.subgroup_id as string),
       projects: (projects.data ?? []).map(({ editor, ...p }) => ({
         ...(p as Project),
         myRole: managed.has(p.company_id) ? 'admin' : (roleOf.get(p.id) ?? null),

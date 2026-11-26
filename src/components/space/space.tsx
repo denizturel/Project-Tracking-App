@@ -26,6 +26,8 @@ export type SpaceInfo = {
   parent: SubgroupNode | null;
   /** May manage this page: a project admin, or the own admin of this group or team (or of its group). */
   isAdmin: boolean;
+  /** Not only a manager: may make admins and create or delete teams here. */
+  isFullAdmin: boolean;
   /** Admin of the whole project (includes company owners and admins). */
   isProjectAdmin: boolean;
   /** Simple layout: a team, or a group in a project that has no teams. */
@@ -49,7 +51,7 @@ type OpenRow = { subgroup_id: string | null };
 
 export function Space(props: { projectId: string } | { subgroupId: string }) {
   const theme = useTheme();
-  const { companies, projects, subgroups, adminSubgroups, loading, error } = useWorkspace();
+  const { companies, projects, subgroups, adminSubgroups, managerSubgroups, loading, error } = useWorkspace();
   const router = useRouter();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
   // The open section is part of the address, so the side menu can link straight to it.
@@ -83,14 +85,17 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
   // and its departments) uses the simple layout for its groups (decided by Deniz).
   const projectHasTeams = subgroups.some((s) => s.project_id === project.id && s.parent_id);
   const simple = level === 'team' || (level === 'group' && !projectHasTeams);
+  const fullAdmin =
+    project.myRole === 'admin' ||
+    (!!subgroup && (adminSubgroups.includes(subgroup.id) || adminSubgroups.includes(subgroup.parent_id ?? '')));
   const info: SpaceInfo = {
     level,
     project,
     subgroup,
     parent,
-    isAdmin:
-      project.myRole === 'admin' ||
-      (!!subgroup && (adminSubgroups.includes(subgroup.id) || adminSubgroups.includes(subgroup.parent_id ?? ''))),
+    // Managers are mini admins of the one group or team they are in (decided by Deniz).
+    isAdmin: fullAdmin || (!!subgroup && managerSubgroups.includes(subgroup.id)),
+    isFullAdmin: fullAdmin,
     isProjectAdmin: project.myRole === 'admin',
     simple,
   };

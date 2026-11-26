@@ -97,6 +97,8 @@ export function People({ info }: { info: SpaceInfo }) {
 
   const inPlace = (id: string) => data.placed.filter((p) => p.subgroup_id === id);
   const shared = { me, project: data.project, projectId: project.id, run, isProjectAdmin };
+  // A manager manages the people of their own group or team only, and cannot make admins.
+  const full = info.isFullAdmin;
   const placeCard = (item: SubgroupNode, title: string) => (
     <PeopleCard
       key={item.id}
@@ -104,7 +106,8 @@ export function People({ info }: { info: SpaceInfo }) {
       title={title}
       people={inPlace(item.id)}
       place={item}
-      canManage={isAdmin}
+      canManage={full || (isAdmin && item.id === subgroup?.id)}
+      canMakeAdmin={full}
       wide={wide}
     />
   );
@@ -148,13 +151,14 @@ export function People({ info }: { info: SpaceInfo }) {
           people={data.project.filter((p) => p.role === 'admin')}
           place={null}
           canManage={false}
+          canMakeAdmin={false}
           wide={wide}
         />
         {groups.flatMap((group) => [
           placeCard(group, kids(group.id).length ? `${group.name} · managers` : group.name),
           ...kids(group.id).map((team) => placeCard(team, `${group.name} · ${team.name}`)),
         ])}
-        <PeopleCard {...shared} title="Whole project" people={data.project} place={null} canManage={isAdmin} wide={wide} />
+        <PeopleCard {...shared} title="Whole project" people={data.project} place={null} canManage={isAdmin} canMakeAdmin={full} wide={wide} />
       </View>
 
       {isAdmin && places.length > 0 && (
@@ -288,12 +292,14 @@ type PeopleCardProps = {
   projectId: string;
   me: string | undefined;
   canManage: boolean;
+  canMakeAdmin: boolean;
   isProjectAdmin: boolean;
   wide: boolean;
   run: Run;
 };
 
-function PeopleCard({ title, people, place, project, projectId, me, canManage, isProjectAdmin, wide, run }: PeopleCardProps) {
+function PeopleCard(props: PeopleCardProps) {
+  const { title, people, place, project, projectId, me, canManage, canMakeAdmin, isProjectAdmin, wide, run } = props;
   const theme = useTheme();
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -360,9 +366,9 @@ function PeopleCard({ title, people, place, project, projectId, me, canManage, i
                   </ThemedText>
                 </View>
                 {place ? (
-                  canManage ? (
+                  canManage && (canMakeAdmin || !ownAdmin) ? (
                     <Choices
-                      options={PLACE_ROLES}
+                      options={canMakeAdmin ? PLACE_ROLES : PLACE_ROLES.slice(1)}
                       value={person.role ?? 'member'}
                       onChange={(role) =>
                         run(
@@ -409,7 +415,7 @@ function PeopleCard({ title, people, place, project, projectId, me, canManage, i
                     }
                   />
                 )}
-                {canManage && !isMe && (place || isProjectAdmin) && removing !== person.user_id && (
+                {canManage && !isMe && (canMakeAdmin || !ownAdmin) && (place || isProjectAdmin) && removing !== person.user_id && (
                   <IconButton
                     icon="x"
                     label={`Remove ${person.profile?.full_name}`}

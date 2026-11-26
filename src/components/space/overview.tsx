@@ -251,7 +251,7 @@ export function Overview({ info }: { info: SpaceInfo }) {
                 );
               })}
             </View>
-            {isAdmin && <NewChild word="team" projectId={project.id} parentId={subgroup?.id ?? null} />}
+            {info.isFullAdmin && <NewChild word="team" projectId={project.id} parentId={subgroup?.id ?? null} />}
           </Card>
         )}
         {taskList('Open tasks', true)}
@@ -456,7 +456,8 @@ function PlaceCard({ item, big, people, openQuestions, teams }: {
 /** "Groups" tab of a project and "Teams" tab of a group: every group as a big card with its teams under it. */
 export function Places({ info }: { info: SpaceInfo }) {
   const { subgroups } = useWorkspace();
-  const { project, subgroup, level, isAdmin } = info;
+  const { project, subgroup, level } = info;
+  const isAdmin = info.isFullAdmin;
   const ids = subgroups.filter((s) => s.project_id === project.id).map((s) => s.id);
   const placed = useRows<PersonRow>(`${project.id}:${ids.length}`, () =>
     supabase
@@ -612,7 +613,7 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
   const { reload } = useWorkspace();
   const { project, subgroup, parent, level, isAdmin, isProjectAdmin } = info;
   // A group's own admin manages its teams but cannot delete the group itself.
-  const canDelete = !!subgroup && (level === 'team' || isProjectAdmin);
+  const canDelete = !!subgroup && info.isFullAdmin && (level === 'team' || isProjectAdmin);
   const item = subgroup ?? project;
   const table = subgroup ? 'subgroups' : 'projects';
 
