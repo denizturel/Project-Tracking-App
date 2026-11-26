@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type CompanyNode, useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 import { locale } from '@/lib/i18n';
+import { takePendingJoin, tokenFrom } from '@/lib/join-link';
 
 type MilestoneRow = { project_id: string; done: boolean };
 type TaskRow = { id: string; project_id: string; title: string; due_date: string | null };
@@ -64,6 +65,24 @@ export default function HomeScreen() {
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? '';
   const open = (id: string, tab?: string) =>
     router.push({ pathname: '/project/[id]', params: tab ? { id, tab } : { id } });
+
+  // A project invite link or QR code that was opened before signing in finishes here.
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const { reload: reloadWorkspace } = useWorkspace();
+  useEffect(() => {
+    takePendingJoin().then(async (token) => {
+      if (!token) return;
+      const joined = await supabase.rpc('join_project_by_link', { link_token: token });
+      if (joined.error) {
+        setJoinError(joined.error.message);
+        return;
+      }
+      reloadWorkspace();
+      router.push({ pathname: '/project/[id]', params: { id: joined.data as string } });
+    });
+    // Once, when Home opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const side = (
     <>
@@ -137,7 +156,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={[styles.page, twoColumns && styles.columns]}>
           <View style={[styles.stack, twoColumns && styles.grow]}>
-            <ErrorText>{error}</ErrorText>
+            <ErrorText>{error ?? joinError}</ErrorText>
             {loading && <ActivityIndicator color={theme.primary} size="large" />}
 
             {!wide && adminOf.length > 0 && !creating && (
@@ -208,6 +227,10 @@ export default function HomeScreen() {
 
             {!twoColumns && projects.length > 0 && side}
 
+            {adminOf.map((company) => (
+              <JoinRequests key={company.id} company={company} />
+            ))}
+            {!loading && <FindCompany first={companies.length === 0} />}
             {!loading && <JoinWithCode />}
             <View style={styles.manage}>
               {adminOf.map((company) => (
@@ -423,10 +446,20 @@ function JoinWithCode() {
   async function join() {
     setBusy(true);
     setError(null);
+    // A project's invite link (or the code inside it) lets you straight in.
+    const linkToken = tokenFrom(code);
+    const byLink = linkToken ? await supabase.rpc('join_project_by_link', { link_token: linkToken }) : null;
+    if (byLink && !byLink.error) {
+      setBusy(false);
+      setCode('');
+      reload();
+      router.push({ pathname: '/project/[id]', params: { id: byLink.data as string } });
+      return;
+    }
     const { error: failed } = await supabase.rpc('accept_invitation', { invite_token: code.trim() });
     setBusy(false);
     if (failed) {
-      setError(failed.message);
+      setError(byLink?.error?.message ?? failed.message);
       return;
     }
     setCode('');
@@ -436,13 +469,155 @@ function JoinWithCode() {
 
   return (
     <Card tint="sky">
-      <ThemedText type="subtitle">Have an invitation code?</ThemedText>
+      <ThemedText type="subtitle">Have an invite link or code?</ThemedText>
       <ThemedText themeColor="textSecondary">
-        An admin can invite your email address to a project and send you a code. Paste it here.
+        Paste the invite link or code an admin gave you. On a phone you can also scan the project&apos;s QR code with
+        the camera.
       </ThemedText>
-      <Field label="Invitation code" value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} />
+      <Field label="Invite link or code" value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} />
       <ErrorText>{error}</ErrorText>
       <Button title="Join" variant="secondary" onPress={join} loading={busy} disabled={code.trim().length < 8} />
+    </Card>
+  );
+}
+
+type Found = { id: string; name: string };
+type Asked = { id: string; company_id: string; name: string; status: 'pending' | 'declined' };
+
+/** Find your company's space by name and ask to join it. The owner or a company admin lets you in. */
+function FindCompany({ first }: { first: boolean }) {
+  const { profile } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(profile?.company_name ?? '');
+  const [found, setFound] = useState<Found[]>([]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const asked = useRows<Asked>('mine', async () => {
+    const { data, error } = await supabase.rpc('my_join_requests');
+    return { data: data as Asked[] | null, error };
+  });
+
+  useEffect(() => {
+    let active = true;
+    // Wait until the typing stops.
+    const timer = setTimeout(async () => {
+      const result =
+        query.trim().length >= 2 ? await supabase.rpc('search_companies', { q: query }) : null;
+      if (active) setFound((result?.data as Found[] | null) ?? []);
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  async function ask(company: Found) {
+    const result = await supabase.from('company_join_requests').insert({ company_id: company.id });
+    setFailed(result.error?.message ?? null);
+    asked.reload();
+  }
+
+  const stateOf = (companyId: string) => asked.rows.find((r) => r.company_id === companyId)?.status;
+  const others = asked.rows.filter((r) => !found.some((f) => f.id === r.company_id));
+  const line = (id: string, name: string) => {
+    const state = stateOf(id);
+    return (
+      <View key={id} style={styles.line}>
+        <Icon name="briefcase" color="primary" />
+        <ThemedText type="bold" raw style={styles.grow} numberOfLines={2}>
+          {name}
+        </ThemedText>
+        {state === 'pending' ? (
+          <Chip text="Waiting for approval" tone="warn" icon="clock" />
+        ) : state === 'declined' ? (
+          <Chip text="Declined" tone="plain" />
+        ) : (
+          <Button title="Ask to join" small variant="secondary" onPress={() => ask({ id, name })} />
+        )}
+      </View>
+    );
+  };
+
+  // Someone who already has a company space sees a button; requests still waiting stay visible.
+  if (!first && !open && asked.rows.length === 0) {
+    return <Button title="Find another company" icon="search" variant="secondary" onPress={() => setOpen(true)} />;
+  }
+
+  return (
+    <Card tint="mint">
+      <ThemedText type="subtitle">Find your company</ThemedText>
+      <ThemedText themeColor="textSecondary">
+        Search for your company&apos;s space and ask to join. Its owner or a company admin lets you in.
+      </ThemedText>
+      <Field label="Company name" value={query} onChangeText={setQuery} autoCorrect={false} />
+      <ErrorText>{failed ?? asked.error}</ErrorText>
+      {found.map((company) => line(company.id, company.name))}
+      {others.map((request) => line(request.company_id, request.name))}
+      {query.trim().length >= 2 && found.length === 0 && others.length === 0 && (
+        <ThemedText type="small" themeColor="textSecondary">
+          No company space with this name that you are not already in.
+        </ThemedText>
+      )}
+    </Card>
+  );
+}
+
+type JoinRequest = {
+  id: string;
+  user_id: string;
+  profile: { full_name: string; position: string | null; company_name: string | null } | null;
+};
+
+/** People who asked to join the company. The owner and company admins let them in or decline. */
+function JoinRequests({ company }: { company: CompanyNode }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const { rows, reload } = useRows<JoinRequest>(company.id, () =>
+    supabase
+      .from('company_join_requests')
+      .select('id, user_id, profile:profiles!user_id(full_name, position, company_name)')
+      .eq('company_id', company.id)
+      .eq('status', 'pending')
+      .order('created_at')
+      .returns<JoinRequest[]>(),
+  );
+
+  if (rows.length === 0) return null;
+
+  async function decide(request: string, as_role: 'member' | 'guest' | 'declined') {
+    setBusy(request);
+    const result = await supabase.rpc('decide_join_request', { request, as_role });
+    setBusy(null);
+    setFailed(result.error?.message ?? null);
+    reload();
+  }
+
+  return (
+    <Card tint="butter">
+      <ThemedText type="subtitle">Waiting to join {company.name}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Staff see the company space. Guests see only the projects they are added to.
+      </ThemedText>
+      <ErrorText>{failed}</ErrorText>
+      {rows.map((request) => (
+        <View key={request.id} style={{ gap: Spacing.two }}>
+          <View style={styles.line}>
+            <Avatar name={request.profile?.full_name} size={36} />
+            <View style={styles.grow}>
+              <ThemedText type="bold" raw>
+                {request.profile?.full_name ?? ''}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" raw>
+                {[request.profile?.position, request.profile?.company_name].filter(Boolean).join(' · ')}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.pick}>
+            <Button title="Let in as staff" small onPress={() => decide(request.id, 'member')} disabled={busy === request.id} />
+            <Button title="Let in as guest" small variant="secondary" onPress={() => decide(request.id, 'guest')} disabled={busy === request.id} />
+            <Button title="Decline" small variant="plain" onPress={() => decide(request.id, 'declined')} disabled={busy === request.id} />
+          </View>
+        </View>
+      ))}
     </Card>
   );
 }

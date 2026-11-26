@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, Share, StyleSheet, Switch, View } from 'react-native';
 
+import { QrCode } from '@/components/qr-code';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, IconButton, TextButton } from '@/components/ui';
@@ -8,7 +9,9 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
+import { appLink, shareLink } from '@/lib/join-link';
 import { supabase } from '@/lib/supabase';
+import { useRows } from '@/lib/use-rows';
 import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
 
 type Person = {
@@ -234,11 +237,13 @@ export function People({ info }: { info: SpaceInfo }) {
       {!subgroup && isProjectAdmin && (
         <>
           <Button
-            title={inviting ? 'Hide invitations' : `Invite someone${data.invitations.length ? ` (${data.invitations.length} waiting)` : ''}`}
+            title={inviting ? 'Hide' : `Invite someone${data.invitations.length ? ` (${data.invitations.length} waiting)` : ''}`}
             icon="user-plus"
             variant="secondary"
             onPress={() => setInviting(!inviting)}
           />
+          {inviting && <AddFromCompany info={info} inProject={data.project.map((p) => p.user_id)} onAdd={(userId) => run(() => supabase.from('project_members').insert({ project_id: project.id, user_id: userId }))} />}
+          {inviting && <InviteLink info={info} />}
           {inviting && (
             <Invite
               info={info}
@@ -499,6 +504,134 @@ const styles = StyleSheet.create({
   addChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
 
+type Colleague = { user_id: string; profile: { full_name: string; position: string | null } | null };
+
+/** People who are already in the company space are added with one press, no code needed. */
+function AddFromCompany(props: { info: SpaceInfo; inProject: string[]; onAdd: (userId: string) => void }) {
+  const { project } = props.info;
+  const { rows, error } = useRows<Colleague>(project.company_id, () =>
+    supabase
+      .from('company_members')
+      .select('user_id, profile:profiles!user_id(full_name, position)')
+      .eq('company_id', project.company_id)
+      .returns<Colleague[]>(),
+  );
+  const waiting = rows
+    .filter((person) => !props.inProject.includes(person.user_id))
+    .sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
+
+  return (
+    <Card tint="mint">
+      <ThemedText type="bold">Add people from the company</ThemedText>
+      <ErrorText>{error}</ErrorText>
+      {waiting.length === 0 && (
+        <ThemedText type="small" themeColor="textSecondary">
+          Everyone in the company space is already in this project.
+        </ThemedText>
+      )}
+      {waiting.map((person) => (
+        <View key={person.user_id} style={styles.person}>
+          <Avatar name={person.profile?.full_name} size={30} />
+          <View style={styles.grow}>
+            <ThemedText raw numberOfLines={1}>
+              {person.profile?.full_name ?? ''}
+            </ThemedText>
+            {!!person.profile?.position && (
+              <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1}>
+                {person.profile.position}
+              </ThemedText>
+            )}
+          </View>
+          <Button title="Add" small variant="secondary" onPress={() => props.onAdd(person.user_id)} />
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+type ProjectLink = { token: string; enabled: boolean };
+
+/** One invite link per project, also shown as a QR code. Whoever opens it joins the project as staff. */
+function InviteLink({ info }: { info: SpaceInfo }) {
+  const theme = useTheme();
+  const projectId = info.project.id;
+  const [failed, setFailed] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const { rows, loading, error, reload } = useRows<ProjectLink>(projectId, () =>
+    supabase.from('project_links').select('token, enabled').eq('project_id', projectId).returns<ProjectLink[]>(),
+  );
+  const link = rows[0] ?? null;
+
+  /** Turns the link on or off, or makes a new one so the old link and QR code stop working. */
+  async function save(change: { enabled?: boolean; token?: string }) {
+    const result = await supabase
+      .from('project_links')
+      .upsert({ project_id: projectId, ...change }, { onConflict: 'project_id' });
+    setFailed(result.error?.message ?? null);
+    setCopied(false);
+    reload();
+  }
+
+  async function share(text: string) {
+    if (Platform.OS === 'web') {
+      await navigator.clipboard?.writeText(text).catch(() => {});
+      setCopied(true);
+    } else {
+      await Share.share({ message: text }).catch(() => {});
+    }
+  }
+
+  const on = !!link?.enabled;
+  const newToken = () =>
+    'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+
+  return (
+    <Card tint="lavender">
+      <View style={styles.between}>
+        <ThemedText type="bold" style={styles.grow}>
+          Invite link and QR code
+        </ThemedText>
+        <Switch
+          accessibilityLabel="Invite link"
+          value={on}
+          disabled={loading}
+          onValueChange={(enabled) => save({ enabled })}
+          trackColor={{ true: theme.primary, false: theme.border }}
+        />
+      </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        {on
+          ? 'Anyone who opens this link or scans the code joins this project as staff. People new to the company come in as guests. Turn it off when everyone is in.'
+          : 'Turn this on to let people join this project with one link or by scanning a QR code, without a code for each person.'}
+      </ThemedText>
+      <ErrorText>{failed ?? error}</ErrorText>
+      {on && link && (
+        <>
+          <QrCode value={appLink(link.token)} />
+          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+            Scan with the phone&apos;s camera. The Doneva app must be on the phone.
+          </ThemedText>
+          <ThemedText type="small" raw selectable style={{ textAlign: 'center' }}>
+            {shareLink(link.token)}
+          </ThemedText>
+          <View style={[styles.between, { justifyContent: 'center', flexWrap: 'wrap' }]}>
+            <Button
+              title={Platform.OS === 'web' ? (copied ? 'Copied' : 'Copy link') : 'Share link'}
+              icon={Platform.OS === 'web' ? 'copy' : 'share'}
+              small
+              onPress={() => share(shareLink(link.token))}
+            />
+            <Button title="Make a new link" icon="refresh-cw" small variant="secondary" onPress={() => save({ token: newToken() })} />
+          </View>
+          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+            A new link stops the old link and QR code from working.
+          </ThemedText>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function Invite(props: {
   info: SpaceInfo;
   invitations: Invitation[];
@@ -553,10 +686,10 @@ function Invite(props: {
 
   return (
     <Card tint="sky">
-      <ThemedText type="bold">Invite someone to this project</ThemedText>
+      <ThemedText type="bold">Invite one person by email</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        They get a code. After they sign up with this email address, they paste the code on their Home
-        screen. Invitations last 14 days.
+        For a code that only one person can use, and to bring someone in as an admin. After they sign up with this
+        email address, they paste the code on their Home screen. Invitations last 14 days.
       </ThemedText>
       <Field
         label="Their email"
