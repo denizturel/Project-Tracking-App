@@ -1,7 +1,8 @@
-import { Link, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
+import { useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
 import { createContext, use, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Link } from '@/components/go';
 import { ThemedText } from '@/components/themed-text';
 import { markOf } from '@/components/space/overview';
 import { GROUP_TABS, PROJECT_TABS, TEAM_TABS } from '@/components/space/space';

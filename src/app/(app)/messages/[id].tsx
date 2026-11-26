@@ -1,8 +1,9 @@
-import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Chat } from '@/components/space/chat';
+import { Link } from '@/components/go';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, ErrorText, Field, Icon, IconButton, TextButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';

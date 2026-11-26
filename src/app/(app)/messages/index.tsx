@@ -1,7 +1,8 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { Link } from '@/components/go';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, ErrorText, SearchField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';

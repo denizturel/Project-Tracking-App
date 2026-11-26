@@ -1,4 +1,4 @@
-import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Chat } from '@/components/space/chat';
@@ -8,6 +8,7 @@ import { Questions } from '@/components/space/questions';
 import { Schedule } from '@/components/space/schedule';
 import { Tasks } from '@/components/space/tasks';
 import { Training } from '@/components/space/training';
+import { Link } from '@/components/go';
 import { ThemedText } from '@/components/themed-text';
 import { Button, ComingNext, ErrorText, Icon, type IconName, Pill, type Tone, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';

@@ -1,10 +1,11 @@
-import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import { ScheduleCard, type ScheduleView, dateText, statusOf, useMilestones } from '@/components/space/schedule';
 import { inScope, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
+import { Link } from '@/components/go';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, EditedLabel, ErrorText, Field, Icon, TextButton, MoreMenu } from '@/components/ui';
 import { Spacing, type ThemeColor } from '@/constants/theme';
