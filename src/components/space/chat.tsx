@@ -31,14 +31,27 @@ type Message = {
 
 type Loaded = { conversationId: string | null; messages: Message[]; error: string | null };
 
-async function fetchChat(info: SpaceInfo): Promise<Loaded> {
+async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined): Promise<Loaded> {
   const conversations = supabase.from('conversations').select('id');
-  const found = await (info.subgroup
-    ? conversations.eq('kind', 'subgroup').eq('subgroup_id', info.subgroup.id)
-    : conversations.eq('kind', 'project').eq('project_id', info.project.id)
+  const found = await (direct
+    ? conversations.eq('id', direct)
+    : info?.subgroup
+      ? conversations.eq('kind', 'subgroup').eq('subgroup_id', info.subgroup.id)
+      : conversations.eq('kind', 'project').eq('project_id', info?.project.id)
   ).maybeSingle();
   if (found.error || !found.data) {
     return { conversationId: null, messages: [], error: found.error?.message ?? 'This chat could not be found.' };
+  }
+  // Opening a private chat marks it as read.
+  if (direct) {
+    const me = (await supabase.auth.getSession()).data.session?.user.id;
+    if (me) {
+      await supabase
+        .from('conversation_participants')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('conversation_id', direct)
+        .eq('user_id', me);
+    }
   }
 
   const messages = await supabase
@@ -60,8 +73,8 @@ async function fetchChat(info: SpaceInfo): Promise<Loaded> {
 const time = (iso: string) =>
   new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-/** Live chat of a project, group or team. */
-export function Chat({ info }: { info: SpaceInfo }) {
+/** Live chat of a project, group or team, or a private chat between two people (`direct`). */
+export function Chat({ info, direct }: { info?: SpaceInfo; direct?: string }) {
   const theme = useTheme();
   const { session } = useAuth();
   const userId = session?.user.id;
@@ -79,7 +92,7 @@ export function Chat({ info }: { info: SpaceInfo }) {
 
   useEffect(() => {
     let active = true;
-    fetchChat(info).then((result) => {
+    fetchChat(info, direct).then((result) => {
       if (active) setData(result);
     });
     return () => {
@@ -87,7 +100,7 @@ export function Chat({ info }: { info: SpaceInfo }) {
     };
     // The chat is identified by ids; `info` itself is a new object on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [info.project.id, info.subgroup?.id, version]);
+  }, [info?.project.id, info?.subgroup?.id, direct, version]);
 
   // New, edited and deleted messages from other people arrive live.
   useEffect(() => {
@@ -176,7 +189,7 @@ export function Chat({ info }: { info: SpaceInfo }) {
                 </ThemedText>
                 {!deleted && <EditedLabel name={item.editor?.full_name ?? null} at={item.edited_at} />}
                 <View style={styles.meta}>
-                  {!deleted && (mine || info.isAdmin) && (
+                  {!deleted && (mine || info?.isAdmin) && (
                     <>
                       <TextButton
                         title="Edit"

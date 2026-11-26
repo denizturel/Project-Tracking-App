@@ -72,6 +72,9 @@ export default function AppLayout() {
             <Stack.Screen name="index" options={{ title: 'Projects' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="project/[id]" options={{ title: 'Project' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="group/[id]" options={{ title: 'Group' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="messages/index" options={{ title: 'Messages' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="messages/[id]" options={{ title: 'Messages' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="connections" options={{ title: 'Connections' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="profile" options={{ title: 'Profile' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="settings" options={{ title: 'Settings' }} dangerouslySingular={onePerPage} />
           </Stack>

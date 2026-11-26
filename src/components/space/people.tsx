@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, Share, StyleSheet, Switch, View } from 'react-native';
 
+import { PersonActions } from '@/components/person-actions';
 import { QrCode } from '@/components/qr-code';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
@@ -369,6 +370,8 @@ function ProfileCard(props: ProfileCardProps) {
             <ThemedText type="label">Role</ThemedText>
             <ThemedText>{job || 'Not filled in'}</ThemedText>
           </View>
+
+          {!isMe && <PersonActions userId={person.user_id} onLeave={onClose} />}
 
           <View style={styles.cardLine}>
             <ThemedText type="label">Status</ThemedText>

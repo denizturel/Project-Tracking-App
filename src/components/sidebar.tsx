@@ -9,6 +9,7 @@ import { Avatar, Icon, type IconName, TextButton } from '@/components/ui';
 import { Spacing, type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { useDirectChats } from '@/lib/direct';
 import { jobText } from '@/lib/i18n';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -37,6 +38,8 @@ export function Sidebar() {
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ tab?: string }>();
+  // Unread private messages; counted again whenever the page changes.
+  const { unread } = useDirectChats(pathname);
 
   const toggle = (id: string) => setFolded((f) => ({ ...f, [id]: !f[id] }));
   const foldable = [
@@ -65,6 +68,8 @@ export function Sidebar() {
   return (
     <ScrollView style={{ backgroundColor: theme.rail }} contentContainerStyle={styles.content}>
       <Row href="/" label="All projects" icon="grid" depth={0} active={pathname === '/'} home />
+      <Row href="/messages" label="Messages" icon="message-circle" depth={0} active={pathname.startsWith('/messages')} badge={unread} />
+      <Row href="/connections" label="Connections" icon="user-check" depth={0} active={pathname === '/connections'} />
 
       <View style={styles.sectionHeader}>
         <ThemedText type="label">Projects</ThemedText>
@@ -262,6 +267,7 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
   const { profile } = useAuth();
   const { companies, projects, subgroups } = useWorkspace();
   const pathname = usePathname();
+  const { unread } = useDirectChats(pathname);
   const openGroup = subgroups.find((s) => pathname === `/group/${s.id}`);
   const openParent = openGroup?.parent_id ?? openGroup?.id;
   const activeProject = openGroup?.project_id ?? projects.find((p) => pathname === `/project/${p.id}`)?.id;
@@ -277,6 +283,22 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
         <Pressable accessibilityRole="link" accessibilityLabel="All projects">
           <View style={box(pathname === '/')}>
             <Icon name="grid" size={22} color={pathname === '/' ? 'primary' : 'textSecondary'} />
+          </View>
+        </Pressable>
+      </Link>
+
+      <Link href="/messages" asChild>
+        <Pressable accessibilityRole="link" accessibilityLabel="Messages">
+          <View style={box(pathname.startsWith('/messages'))}>
+            <Icon name="message-circle" size={22} color={pathname.startsWith('/messages') ? 'primary' : 'textSecondary'} />
+            {unread > 0 && <View style={[styles.dot, { backgroundColor: theme.primary }]} />}
+          </View>
+        </Pressable>
+      </Link>
+      <Link href="/connections" asChild>
+        <Pressable accessibilityRole="link" accessibilityLabel="Connections">
+          <View style={box(pathname === '/connections')}>
+            <Icon name="user-check" size={22} color={pathname === '/connections' ? 'primary' : 'textSecondary'} />
           </View>
         </Pressable>
       </Link>
@@ -352,9 +374,11 @@ type RowProps = {
   onToggle?: () => void;
   /** Goes back to the first page instead of opening it again on top. */
   home?: boolean;
+  /** A count shown at the end of the row, e.g. unread messages. */
+  badge?: number;
 };
 
-function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home }: RowProps) {
+function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home, badge }: RowProps) {
   const theme = useTheme();
   const closeMenu = use(MenuClose);
 
@@ -373,6 +397,13 @@ function Row({ href, label, depth, icon, bold, small, mark, active, folded, onTo
               style={styles.grow}>
               {label}
             </ThemedText>
+            {!!badge && (
+              <View accessibilityLabel="Unread messages" style={[styles.badge, { backgroundColor: theme.primary }]}>
+                <ThemedText type="smallBold" raw style={{ color: theme.onPrimary, fontSize: 13, lineHeight: 18 }}>
+                  {badge}
+                </ThemedText>
+              </View>
+            )}
           </View>
         </Pressable>
       </Link>
@@ -392,6 +423,8 @@ function Row({ href, label, depth, icon, bold, small, mark, active, folded, onTo
 
 const styles = StyleSheet.create({
   content: { padding: 10, gap: 2, paddingBottom: Spacing.five },
+  dot: { position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: 5 },
+  badge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
   grow: { flex: 1, minWidth: 0 },
   sectionHeader: {
     flexDirection: 'row',
