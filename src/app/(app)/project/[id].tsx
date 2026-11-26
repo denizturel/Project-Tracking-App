@@ -11,6 +11,35 @@ import { type Project, type Subgroup, supabase } from '@/lib/supabase';
 
 const TINTS: ThemeColor[] = ['lavender', 'mint', 'sky', 'butter'];
 
+type ProjectData = {
+  project: Project | null;
+  subgroups: Subgroup[];
+  isAdmin: boolean;
+  error: string | null;
+};
+
+async function fetchProject(id: string, userId: string): Promise<ProjectData> {
+  const [p, s, m] = await Promise.all([
+    supabase
+      .from('projects')
+      .select('id, company_id, name, description, restrict_to_subgroups, edited_at')
+      .eq('id', id)
+      .maybeSingle(),
+    supabase
+      .from('subgroups')
+      .select('id, project_id, parent_id, name, description, color')
+      .eq('project_id', id)
+      .order('name'),
+    supabase.from('project_members').select('role').eq('project_id', id).eq('user_id', userId).maybeSingle(),
+  ]);
+  return {
+    project: p.data,
+    subgroups: s.data ?? [],
+    isAdmin: m.data?.role === 'admin',
+    error: (p.error ?? s.error ?? m.error)?.message ?? null,
+  };
+}
+
 /** Project overview: description, then its groups with the teams inside each. */
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,38 +47,26 @@ export default function ProjectScreen() {
   const theme = useTheme();
   const userId = session?.user.id;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [subgroups, setSubgroups] = useState<Subgroup[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    const [p, s, m] = await Promise.all([
-      supabase
-        .from('projects')
-        .select('id, company_id, name, description, restrict_to_subgroups, edited_at')
-        .eq('id', id)
-        .maybeSingle(),
-      supabase
-        .from('subgroups')
-        .select('id, project_id, parent_id, name, description, color')
-        .eq('project_id', id)
-        .order('name'),
-      supabase.from('project_members').select('role').eq('project_id', id).eq('user_id', userId).maybeSingle(),
-    ]);
-    const failed = p.error ?? s.error ?? m.error;
-    setError(failed?.message ?? null);
-    setProject(p.data);
-    setSubgroups(s.data ?? []);
-    setIsAdmin(m.data?.role === 'admin');
-    setLoaded(true);
-  }, [id, userId]);
+  const [data, setData] = useState<ProjectData | null>(null);
+  const [version, setVersion] = useState(0);
+  const load = useCallback(async () => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!userId) return;
+    let active = true;
+    fetchProject(id, userId).then((result) => {
+      if (active) setData(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [id, userId, version]);
+
+  const loaded = data !== null;
+  const project = data?.project ?? null;
+  const subgroups = data?.subgroups ?? [];
+  const isAdmin = data?.isAdmin ?? false;
+  const error = data?.error ?? null;
 
   if (!loaded) {
     return (

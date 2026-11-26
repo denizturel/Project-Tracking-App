@@ -11,6 +11,31 @@ import { type Company, type CompanyRole, type Project, supabase } from '@/lib/su
 
 type Space = Company & { role: CompanyRole; projects: Project[] };
 
+async function fetchSpaces(userId: string): Promise<{ spaces: Space[] | null; error: string | null }> {
+  const [memberships, projects] = await Promise.all([
+    supabase.from('company_members').select('role, companies(id, name)').eq('user_id', userId),
+    supabase
+      .from('projects')
+      .select('id, company_id, name, description, restrict_to_subgroups, edited_at')
+      .order('name'),
+  ]);
+  const failed = memberships.error ?? projects.error;
+  if (failed) return { spaces: null, error: failed.message };
+
+  const spaces = (memberships.data ?? []).flatMap((row) => {
+    const company = row.companies as unknown as Company | null;
+    if (!company) return [];
+    return [
+      {
+        ...company,
+        role: row.role as CompanyRole,
+        projects: (projects.data ?? []).filter((p) => p.company_id === company.id),
+      },
+    ];
+  });
+  return { spaces, error: null };
+}
+
 export default function ProjectsScreen() {
   const { session, profile, signOut } = useAuth();
   const theme = useTheme();
@@ -18,40 +43,21 @@ export default function ProjectsScreen() {
 
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    const [memberships, projects] = await Promise.all([
-      supabase.from('company_members').select('role, companies(id, name)').eq('user_id', userId),
-      supabase
-        .from('projects')
-        .select('id, company_id, name, description, restrict_to_subgroups, edited_at')
-        .order('name'),
-    ]);
-    const failed = memberships.error ?? projects.error;
-    if (failed) {
-      setError(failed.message);
-      return;
-    }
-    setError(null);
-    setSpaces(
-      (memberships.data ?? []).flatMap((row) => {
-        const company = row.companies as unknown as Company | null;
-        if (!company) return [];
-        return [
-          {
-            ...company,
-            role: row.role as CompanyRole,
-            projects: (projects.data ?? []).filter((p) => p.company_id === company.id),
-          },
-        ];
-      }),
-    );
-  }, [userId]);
+  const [version, setVersion] = useState(0);
+  const load = useCallback(async () => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!userId) return;
+    let active = true;
+    fetchSpaces(userId).then((result) => {
+      if (!active) return;
+      setError(result.error);
+      if (result.spaces) setSpaces(result.spaces);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId, version]);
 
   return (
     <Screen>
