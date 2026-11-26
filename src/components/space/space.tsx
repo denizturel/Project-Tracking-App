@@ -66,8 +66,13 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
     isAdmin: project.myRole === 'admin',
   };
   const name = subgroup?.name ?? project.name;
-  const tabs = info.level === 'team' ? TEAM_TABS : FULL_TABS;
-  const inner = tab === 'Chat' && info.level === 'team' ? chatTab : tab === 'Chat' ? 'Messages' : tab;
+  // A project that has groups but no teams anywhere (for example one single hotel
+  // and its departments) uses the simple layout for its groups (decided by Deniz).
+  const projectHasTeams = subgroups.some((s) => s.project_id === project.id && s.parent_id);
+  const simple = info.level === 'team' || (info.level === 'group' && !projectHasTeams);
+  const tabs = simple ? TEAM_TABS : FULL_TABS;
+  const shownTab = tabs.includes(tab) ? tab : 'Overview';
+  const inner = shownTab === 'Chat' && simple ? chatTab : shownTab === 'Chat' ? 'Messages' : shownTab;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -79,8 +84,8 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
           {parent && <Crumb label={parent.name} href={{ pathname: '/group/[id]', params: { id: parent.id } }} />}
           {subgroup && <Crumb label={subgroup.name} last />}
         </View>
-        <TabBar tabs={tabs} value={tab} onChange={setTab} />
-        {tab === 'Chat' && info.level === 'team' && (
+        <TabBar tabs={tabs} value={shownTab} onChange={setTab} />
+        {shownTab === 'Chat' && simple && (
           <TabBar tabs={TEAM_CHAT_TABS} value={chatTab} onChange={setChatTab} small />
         )}
       </View>
