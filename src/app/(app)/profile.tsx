@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, ErrorText, Field } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
+import { jobText } from '@/lib/i18n';
 import { WIDE_SCREEN } from '@/lib/workspace';
 import { supabase } from '@/lib/supabase';
 
@@ -61,7 +62,7 @@ export default function ProfileScreen() {
           <View style={styles.grow}>
             <ThemedText type="subtitle">{profile?.full_name}</ThemedText>
             <ThemedText themeColor="textSecondary">
-              {[profile?.position, profile?.company_name].filter(Boolean).join(' at ')}
+              {jobText(profile?.position, profile?.company_name)}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {session?.user.email}

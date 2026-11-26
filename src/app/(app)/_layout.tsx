@@ -7,7 +7,7 @@ import { MenuClose, MiniRail, Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { WIDE_SCREEN, WorkspaceProvider } from '@/lib/workspace';
 
 /** The same project or group is the same page, whichever of its tabs is asked for. */
@@ -15,6 +15,7 @@ const onePerPage = (name: string, params: Record<string, unknown>) => `${name}:$
 
 export default function AppLayout() {
   const theme = useTheme();
+  const dark = useIsDark();
   const insets = useSafeAreaInsets();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
   // Wide screens: the menu stays open until it is closed with its button.
@@ -49,6 +50,7 @@ export default function AppLayout() {
             screenOptions={{
               // Wide screens have the side menu and each page's own title instead.
               headerShown: !wide,
+              statusBarStyle: dark ? 'light' : 'dark',
               contentStyle: { backgroundColor: theme.background },
               // Our own top bar on phones: buttons placed in the built-in iPhone bar do not show up.
               header: ({ options, back, navigation }) => (

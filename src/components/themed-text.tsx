@@ -2,7 +2,7 @@ import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { trChildren } from '@/lib/i18n';
+import { capitals, trChildren } from '@/lib/i18n';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'bold' | 'title' | 'subtitle' | 'heading' | 'small' | 'smallBold' | 'link' | 'label' | 'number';
@@ -17,7 +17,7 @@ export function ThemedText({ style, type = 'default', themeColor, raw, children,
 
   return (
     <Text style={[{ color }, styles[type], style]} {...rest}>
-      {raw ? children : trChildren(children)}
+      {raw ? children : type === 'label' ? capitals(trChildren(children)) : trChildren(children)}
     </Text>
   );
 }

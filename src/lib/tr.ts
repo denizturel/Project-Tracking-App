@@ -380,6 +380,7 @@ export const TR: Record<string, string> = {
 
 /** Texts with a changing part. {0} {1}: kept as written. {n}: a number. {t}: translated too. */
 export const TR_PATTERNS: [string, string][] = [
+  ['{0} (you)', '{0} (siz)'],
   ['People and admins of {0}', '{0} kişileri ve yöneticileri'],
   ['People of {0}', '{0} kişileri'],
   ['No projects in {0} yet. Use "New project" to start the first one.', '{0} içinde henüz proje yok. İlkini başlatmak için "Yeni proje"yi kullanın.'],

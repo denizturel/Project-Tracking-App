@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Fragment, useEffect } from 'react';
 
 import { LockScreen } from '@/components/lock-screen';
-import { useTheme } from '@/hooks/use-theme';
+import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { AppLockProvider, useAppLock } from '@/lib/app-lock';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { usePrefs } from '@/lib/prefs';
@@ -29,7 +29,8 @@ function RootNavigator() {
   const { loading, session, profile } = useAuth();
   const theme = useTheme();
   const { locked } = useAppLock();
-  const { lang, mode, ready: prefsReady } = usePrefs();
+  const { lang, ready: prefsReady } = usePrefs();
+  const dark = useIsDark();
 
   const [fontsReady, fontsFailed] = useFonts({
     Manrope_500Medium,
@@ -54,10 +55,10 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style={mode === 'system' ? 'auto' : mode === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={dark ? 'light' : 'dark'} />
       {/* A new language draws every screen again from the start. */}
       <Fragment key={lang}>
-        <Screens signedIn={signedIn} ready={ready} theme={theme} />
+        <Screens signedIn={signedIn} ready={ready} theme={theme} dark={dark} />
         {signedIn && locked && <LockScreen />}
       </Fragment>
     </>
@@ -68,7 +69,9 @@ function Screens({
   signedIn,
   ready,
   theme,
+  dark,
 }: {
+  dark: boolean;
   signedIn: boolean;
   ready: boolean;
   theme: ReturnType<typeof useTheme>;
@@ -76,6 +79,7 @@ function Screens({
   return (
     <Stack
       screenOptions={{
+        statusBarStyle: dark ? 'light' : 'dark',
         headerStyle: { backgroundColor: theme.backgroundElement },
         headerTintColor: theme.text,
         headerTitleStyle: { fontSize: 20, fontFamily: 'Sora_600SemiBold' },

@@ -81,3 +81,17 @@ export function trChildren(children: ReactNode): ReactNode {
   }
   return children.map((child) => (typeof child === 'string' ? tr(child) : child));
 }
+
+/** "Sales manager at Eptera", or the Turkish order "Eptera · Sales manager". */
+export function jobText(position: string | null | undefined, company: string | null | undefined): string {
+  const parts = [position, company].filter(Boolean) as string[];
+  return currentLang() === 'tr' ? parts.reverse().join(' · ') : parts.join(' at ');
+}
+
+/** Capitals the Turkish way (i becomes İ) for labels shown in capital letters. */
+export function capitals(node: ReactNode): ReactNode {
+  if (currentLang() !== 'tr') return node;
+  if (typeof node === 'string') return node.toLocaleUpperCase('tr');
+  if (Array.isArray(node)) return node.map((child) => (typeof child === 'string' ? child.toLocaleUpperCase('tr') : child));
+  return node;
+}

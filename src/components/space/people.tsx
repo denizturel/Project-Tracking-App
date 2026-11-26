@@ -7,6 +7,7 @@ import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, IconButton
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { jobText } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
 
@@ -327,7 +328,7 @@ function ProfileCard(props: ProfileCardProps) {
   const [adding, setAdding] = useState(false);
   // Leaving or removing takes two presses, so a slip does nothing.
   const [confirming, setConfirming] = useState<string | null>(null);
-  const job = [person.profile?.position, person.profile?.company_name].filter(Boolean).join(' at ');
+  const job = jobText(person.profile?.position, person.profile?.company_name);
   const statusText = status === 'manager' ? `Manager of ${manages.join(', ')}` : STATUS_LABEL[status];
 
   const choose = (next: Status) => {

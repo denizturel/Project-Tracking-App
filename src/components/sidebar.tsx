@@ -9,6 +9,7 @@ import { Avatar, Icon, type IconName, TextButton } from '@/components/ui';
 import { Spacing, type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { jobText } from '@/lib/i18n';
 import { useWorkspace } from '@/lib/workspace';
 
 const ICONS: Record<string, IconName> = {
@@ -243,7 +244,7 @@ export function Sidebar() {
               {profile?.full_name}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {profile?.position} at {profile?.company_name}
+              {jobText(profile?.position, profile?.company_name)}
             </ThemedText>
           </View>
         </View>
