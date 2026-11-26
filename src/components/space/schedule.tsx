@@ -5,7 +5,7 @@ import { personName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { Tick } from '@/components/space/tasks';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, Chip, EditedLabel, ErrorText, Field, IconButton, Segmented } from '@/components/ui';
+import { Button, Card, Chip, EditedLabel, ErrorText, Field, IconButton, Segmented, MoreMenu } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { parseDate, useRows } from '@/lib/use-rows';
@@ -265,7 +265,7 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
                   )}
                   <EditedLabel name={m.edited_at ? personName(m.editor) : null} at={m.edited_at} />
                 </View>
-                {edit && <IconButton icon="edit-2" label={`Edit ${m.title}`} onPress={() => edit(m.id)} />}
+                {edit && <MoreMenu actions={[{ title: 'Edit', onPress: () => edit(m.id) }]} />}
               </View>
             );
           })}

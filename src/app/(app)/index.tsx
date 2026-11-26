@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon } from '@/components/ui';
-import { Spacing, type ThemeColor, WideContentWidth } from '@/constants/theme';
+import { Button, Card, Chip, ErrorText, Field, Icon } from '@/components/ui';
+import { type ThemeColor, WideContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
-import { type CompanyNode, useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
+import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
+import { NewProject } from '@/components/new-project';
 import { locale } from '@/lib/i18n';
 import { takePendingJoin, tokenFrom } from '@/lib/join-link';
 
@@ -229,9 +229,6 @@ export default function HomeScreen() {
 
             {!loading && <JoinWithCode />}
             <View style={styles.manage}>
-              {adminOf.map((company) => (
-                <CompanyPeople key={company.id} company={company} />
-              ))}
               {!loading && <NewCompany first={companies.length === 0} />}
             </View>
           </View>
@@ -279,158 +276,6 @@ const styles = StyleSheet.create({
   manage: { gap: 12 },
   pick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
-
-type CompanyPerson = {
-  user_id: string;
-  role: 'owner' | 'admin' | 'manager' | 'member' | 'guest';
-  profile: { full_name: string; position: string | null } | null;
-};
-
-const ROLE_WORDS = { owner: 'Owner', admin: 'Company admin', manager: 'Manager', member: 'Staff', guest: 'Guest' };
-const COMPANY_ROLES = [
-  { value: 'admin', label: 'Company admin' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'member', label: 'Staff' },
-  { value: 'guest', label: 'Guest' },
-] as const;
-
-/** Who is in the company space. Only the owner changes people's company status. */
-function CompanyPeople({ company }: { company: CompanyNode }) {
-  const { session } = useAuth();
-  const me = session?.user.id;
-  const [open, setOpen] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-
-  const { rows, error, reload } = useRows<CompanyPerson>(company.id, () =>
-    supabase
-      .from('company_members')
-      .select('user_id, role, profile:profiles!user_id(full_name, position)')
-      .eq('company_id', company.id)
-      .returns<CompanyPerson[]>(),
-  );
-
-  if (!open) {
-    return (
-      <Button
-        title={`People and admins of ${company.name}`}
-        icon="users"
-        variant="secondary"
-        onPress={() => setOpen(true)}
-      />
-    );
-  }
-
-  async function setRole(userId: string, role: 'admin' | 'manager' | 'member' | 'guest') {
-    const result = await supabase
-      .from('company_members')
-      .update({ role })
-      .eq('company_id', company.id)
-      .eq('user_id', userId);
-    setFailed(result.error?.message ?? null);
-    reload();
-  }
-
-  const people = [...rows].sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
-
-  return (
-    <Card tint="lavender">
-      <ThemedText type="subtitle">People of {company.name}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        The owner created the company space and is the only one who changes these statuses. Company admins
-        create, edit and delete projects and are admins inside every project. Managers see every project but do
-        not manage them. Staff and guests see only what they were added to.
-      </ThemedText>
-      <ErrorText>{failed ?? error}</ErrorText>
-      {people.map((person) => (
-        <View key={person.user_id} style={{ gap: Spacing.two }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Avatar name={person.profile?.full_name} size={36} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <ThemedText type="bold">
-                {person.profile?.full_name ?? 'Unknown'}
-                {person.user_id === me ? ' (you)' : ''}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {[person.profile?.position, ROLE_WORDS[person.role]].filter(Boolean).join(' · ')}
-              </ThemedText>
-            </View>
-          </View>
-          {company.role === 'owner' && person.user_id !== me && person.role !== 'owner' && (
-            <Choices options={COMPANY_ROLES} value={person.role} onChange={(role) => setRole(person.user_id, role)} />
-          )}
-        </View>
-      ))}
-      <Button title="Close" variant="plain" onPress={() => setOpen(false)} />
-    </Card>
-  );
-}
-
-function NewProject({ companies, onClose }: { companies: CompanyNode[]; onClose: () => void }) {
-  const router = useRouter();
-  const theme = useTheme();
-  const { reload } = useWorkspace();
-  const [companyId, setCompanyId] = useState(companies[0]?.id);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function create() {
-    setBusy(true);
-    setError(null);
-    const { data, error: failed } = await supabase
-      .from('projects')
-      .insert({ company_id: companyId, name: name.trim(), description: description.trim() || null })
-      .select('id')
-      .single();
-    setBusy(false);
-    if (failed) {
-      setError(failed.message);
-      return;
-    }
-    reload();
-    onClose();
-    // Straight into the new project's workspace.
-    router.push({ pathname: '/project/[id]', params: { id: data.id } });
-  }
-
-  return (
-    <Card>
-      <ThemedText type="subtitle">New project</ThemedText>
-      {companies.length > 1 && (
-        <View style={{ gap: Spacing.one }}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            Company space
-          </ThemedText>
-          <View style={styles.pick}>
-            {companies.map((company) => (
-              <Pressable
-                key={company.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: company.id === companyId }}
-                onPress={() => setCompanyId(company.id)}
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: company.id === companyId ? theme.primary : theme.border,
-                  backgroundColor: company.id === companyId ? theme.backgroundSelected : theme.card,
-                }}>
-                <ThemedText type="bold">{company.name}</ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-      <Field label="Project name" required value={name} onChangeText={setName} />
-      <Field label="Description" value={description} onChangeText={setDescription} multiline />
-      <ErrorText>{error}</ErrorText>
-      <Button title="Create project" onPress={create} loading={busy} disabled={!name.trim() || !companyId} />
-      <Button title="Cancel" variant="plain" onPress={onClose} disabled={busy} />
-    </Card>
-  );
-}
 
 function JoinWithCode() {
   const router = useRouter();

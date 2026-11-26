@@ -7,7 +7,7 @@ import { Tag } from '@/components/space/questions';
 import { inScope, personName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, EditedLabel, ErrorText, Field, TextButton } from '@/components/ui';
+import { Button, Card, EditedLabel, ErrorText, Field, TextButton, MoreMenu } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
@@ -310,13 +310,18 @@ function ItemCard({ copies, places, here, showPlaces, isAdmin, onChanged }: Card
           <EditedLabel name={item.edited_at ? personName(item.editor) : null} at={item.edited_at} />
           <View style={styles.row}>
             <TextButton title={item.kind === 'link' ? 'Open link' : 'Open document'} onPress={open} disabled={busy} />
-            {isAdmin && <TextButton title="Edit" onPress={() => setEditing(true)} />}
             {isAdmin && (
-              <TextButton
-                title={copies.length > 1 ? `Remove from ${here === item.subgroup_id ? 'here' : 'one place'}` : 'Remove'}
-                danger
-                disabled={busy}
-                onPress={() => run(supabase.from('training_items').delete().eq('id', item.id))}
+              <MoreMenu
+                actions={[
+                  { title: 'Edit', onPress: () => setEditing(true) },
+                  {
+                    title: copies.length > 1 ? `Remove from ${here === item.subgroup_id ? 'here' : 'one place'}` : 'Remove',
+                    danger: true,
+                    confirm: true,
+                    disabled: busy,
+                    onPress: () => run(supabase.from('training_items').delete().eq('id', item.id)),
+                  },
+                ]}
               />
             )}
           </View>

@@ -5,6 +5,7 @@ import { createContext, type ReactNode, use, useCallback, useEffect, useMemo, us
 import { AppState, Platform } from 'react-native';
 
 import { type Profile, supabase } from '@/lib/supabase';
+import { forgetRows } from '@/lib/use-rows';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -47,7 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The same person again (a renewed sign-in, or coming back to the browser tab) must not redraw every page.
       const samePerson = !!next && shownUser.current === next.user.id;
       shownUser.current = next?.user.id ?? null;
-      if (!samePerson) setSession(next);
+      if (!samePerson) {
+        forgetRows();
+        setSession(next);
+      }
       if (!next) {
         setProfile(null);
         setLoading(false);

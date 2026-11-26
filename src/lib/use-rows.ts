@@ -3,12 +3,27 @@ import { locale } from '@/lib/i18n';
 
 type Result<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
+/** What each list held the last time it was loaded, so a page opened again shows at once. */
+const remembered = new Map<string, unknown[]>();
+
+/** Forget everything, for when another person signs in on this device. */
+export function forgetRows() {
+  remembered.clear();
+  keptChats.clear();
+}
+
+/** The messages of chats opened earlier, kept the same way. */
+export const keptChats = new Map<string, unknown>();
+
 /**
  * Loads a list from the database. `key` says when to load again (for example
- * the project id); call `reload` after saving something.
+ * the project id); call `reload` after saving something. A list that was
+ * loaded before is shown straight away and then brought up to date quietly.
  */
 export function useRows<T>(key: string, load: () => Result<T>) {
-  const [rows, setRows] = useState<T[] | null>(null);
+  // The same call in the code with the same key is the same list.
+  const memory = `${key}|${load.toString()}`;
+  const [loaded, setLoaded] = useState<{ memory: string; rows: T[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
@@ -18,7 +33,10 @@ export function useRows<T>(key: string, load: () => Result<T>) {
     load().then((result) => {
       if (!active) return;
       setError(result.error?.message ?? null);
-      if (result.data) setRows(result.data);
+      if (result.data) {
+        remembered.set(memory, result.data);
+        setLoaded({ memory, rows: result.data });
+      }
     });
     return () => {
       active = false;
@@ -27,6 +45,7 @@ export function useRows<T>(key: string, load: () => Result<T>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version]);
 
+  const rows = loaded?.memory === memory ? loaded.rows : ((remembered.get(memory) as T[] | undefined) ?? loaded?.rows ?? null);
   return { rows: rows ?? [], loading: rows === null && error === null, error, reload };
 }
 

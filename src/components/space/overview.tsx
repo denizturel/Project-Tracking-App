@@ -6,7 +6,7 @@ import { ScheduleCard, type ScheduleView, dateText, statusOf, useMilestones } fr
 import { inScope, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, Card, Chip, EditedLabel, ErrorText, Field, Icon, TextButton } from '@/components/ui';
+import { Avatar, Button, Card, Chip, EditedLabel, ErrorText, Field, Icon, TextButton, MoreMenu } from '@/components/ui';
 import { Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -678,15 +678,13 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
       <ErrorText>{error}</ErrorText>
       {isAdmin && (
         <View style={styles.actions}>
-          <Button
-            title={`Edit ${level}`}
-            icon="edit-2"
-            small
-            variant="secondary"
-            onPress={() => setEditing(true)}
-          />
-          {canDelete && !confirmDelete && (
-            <TextButton title={`Delete this ${level}`} danger onPress={() => setConfirmDelete(true)} />
+          {!confirmDelete && (
+            <MoreMenu
+              actions={[
+                { title: `Edit ${level}`, onPress: () => setEditing(true) },
+                canDelete && { title: `Delete this ${level}`, danger: true, onPress: () => setConfirmDelete(true) },
+              ]}
+            />
           )}
           {canDelete && confirmDelete && (
             <>

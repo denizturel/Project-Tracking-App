@@ -1,4 +1,4 @@
-import { Link, useGlobalSearchParams, usePathname } from 'expo-router';
+import { Link, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
 import { createContext, use, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -37,6 +37,8 @@ export function Sidebar() {
   const { companies, projects, subgroups, adminSubgroups, loading } = useWorkspace();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
+  const router = useRouter();
+  const closeMenu = use(MenuClose);
   const params = useGlobalSearchParams<{ tab?: string }>();
   // Unread private messages; counted again when a chat is opened or left (new messages arrive by themselves).
   const { unread } = useDirectChats(pathname.startsWith('/messages') ? pathname : '');
@@ -89,11 +91,16 @@ export function Sidebar() {
         const closed = !!folded[company.id];
         return (
           <View key={company.id} style={styles.company}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={closed ? `Expand ${company.name}` : `Collapse ${company.name}`}
-              onPress={() => toggle(company.id)}
-              style={({ pressed }) => [styles.companyHeader, { opacity: pressed ? 0.7 : 1 }]}>
+            <View style={[styles.companyHeader, pathname === `/company/${company.id}` && [styles.active, { backgroundColor: theme.card }]]}>
+              {/* The name opens the company's own page; the arrow folds its projects. */}
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Open ${company.name}`}
+                onPress={() => {
+                  closeMenu?.();
+                  router.push({ pathname: '/company/[id]', params: { id: company.id } });
+                }}
+                style={({ pressed }) => [styles.companyName, { opacity: pressed ? 0.7 : 1 }]}>
               <View style={[styles.logo, { backgroundColor: theme.primary }]}>
                 <ThemedText style={{ color: theme.onPrimary, fontFamily: Type.headBold, fontSize: 17 }}>
                   {company.name.trim()[0]?.toUpperCase() ?? '?'}
@@ -107,12 +114,20 @@ export function Sidebar() {
                   Company space
                 </ThemedText>
               </View>
-              <Icon name={closed ? 'chevron-right' : 'chevron-down'} size={20} />
-            </Pressable>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={closed ? `Expand ${company.name}` : `Collapse ${company.name}`}
+                onPress={() => toggle(company.id)}
+                hitSlop={10}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}>
+                <Icon name={closed ? 'chevron-right' : 'chevron-down'} size={20} />
+              </Pressable>
+            </View>
 
             {!closed && mine.length === 0 && (
               <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
-                No projects here yet. Create one from All projects.
+                No projects here yet.
               </ThemedText>
             )}
             {(closed ? [] : mine).map((project) => {
@@ -434,6 +449,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   company: { gap: 2, marginTop: Spacing.two },
+  companyName: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   companyHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12 },
   logo: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   note: { paddingVertical: Spacing.one, paddingHorizontal: 12 },

@@ -9,7 +9,7 @@ import { Schedule } from '@/components/space/schedule';
 import { Tasks } from '@/components/space/tasks';
 import { Training } from '@/components/space/training';
 import { ThemedText } from '@/components/themed-text';
-import { Button, ComingNext, ErrorText, Icon, type IconName, Pill, type Tone } from '@/components/ui';
+import { Button, ComingNext, ErrorText, Icon, type IconName, Pill, type Tone, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -213,16 +213,10 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
                 small
                 onPress={() => setTab('People')}
               />
-              {isAdmin && (
-                <Button
-                  title={`Edit ${word}`}
-                  icon="edit-2"
-                  variant="secondary"
-                  small
-                  onPress={() => router.setParams({ tab: 'Overview', edit: '1' })}
-                />
-              )}
               {isAdmin && <Button title="Add people" icon="plus" small onPress={() => setTab('People')} />}
+              {isAdmin && (
+                <MoreMenu actions={[{ title: `Edit ${word}`, onPress: () => router.setParams({ tab: 'Overview', edit: '1' }) }]} />
+              )}
             </View>
           )}
         </View>

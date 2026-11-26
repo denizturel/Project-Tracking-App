@@ -6,7 +6,7 @@ import { Tag } from '@/components/space/questions';
 import { inScope, personName, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, Chip, Choices, EditedLabel, ErrorText, Field, Icon, TextButton } from '@/components/ui';
+import { Button, Card, Chip, Choices, EditedLabel, ErrorText, Field, Icon, MoreMenu } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -365,15 +365,12 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
           </ThemedText>
           {canEdit && (
             <View style={styles.row}>
-              <TextButton title="Edit" onPress={() => setEditing(true)} />
-              {isAdmin && (
-                <TextButton
-                  title="Delete"
-                  danger
-                  disabled={busy}
-                  onPress={() => run(supabase.from('tasks').delete().eq('id', task.id))}
-                />
-              )}
+              <MoreMenu
+                actions={[
+                  { title: 'Edit', onPress: () => setEditing(true) },
+                  isAdmin && { title: 'Delete', danger: true, confirm: true, disabled: busy, onPress: () => run(supabase.from('tasks').delete().eq('id', task.id)) },
+                ]}
+              />
             </View>
           )}
         </>
@@ -409,11 +406,8 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
                 )}
               </View>
               {isAdmin && (
-                <TextButton
-                  title="Remove"
-                  danger
-                  disabled={busy}
-                  onPress={() => run(supabase.from('task_checklist_items').delete().eq('id', step.id))}
+                <MoreMenu
+                  actions={[{ title: 'Remove', danger: true, disabled: busy, onPress: () => run(supabase.from('task_checklist_items').delete().eq('id', step.id)) }]}
                 />
               )}
             </View>
@@ -434,11 +428,8 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
               <ThemedText raw>{entry.body}</ThemedText>
               <EditedLabel name={entry.edited_at ? personName(entry.editor) : null} at={entry.edited_at} />
               {(isAdmin || entry.author_id === me) && (
-                <TextButton
-                  title="Delete note"
-                  danger
-                  disabled={busy}
-                  onPress={() => run(supabase.from('task_notes').delete().eq('id', entry.id))}
+                <MoreMenu
+                  actions={[{ title: 'Delete note', danger: true, disabled: busy, onPress: () => run(supabase.from('task_notes').delete().eq('id', entry.id)) }]}
                 />
               )}
             </View>

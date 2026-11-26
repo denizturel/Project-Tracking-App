@@ -4,21 +4,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { inScope, personName, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import {
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  Choices,
-  EditedLabel,
-  ErrorText,
-  Field,
-  Icon,
-  IconButton,
-  type IconName,
-  SearchField,
-  type Tone,
-} from '@/components/ui';
+import { Avatar, Button, Card, Chip, Choices, EditedLabel, ErrorText, Field, Icon, type IconName, SearchField, type Tone, MoreMenu } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -328,7 +314,12 @@ function QuestionCard({ question, place, me, isAdmin, forceOpen, onChanged }: Ca
           </View>
         </Pressable>
         {(mine || isAdmin) && (
-          <IconButton icon="edit-2" label="Edit question" onPress={() => { setOpened(true); setEditing(true); }} />
+          <MoreMenu
+            actions={[
+              { title: 'Edit', onPress: () => { setOpened(true); setEditing(true); } },
+              isAdmin && { title: 'Delete', danger: true, confirm: true, disabled: busy, onPress: () => run(supabase.from('questions').delete().eq('id', question.id)) },
+            ]}
+          />
         )}
       </View>
 
@@ -339,16 +330,6 @@ function QuestionCard({ question, place, me, isAdmin, forceOpen, onChanged }: Ca
           <View style={styles.row}>
             <Button title="Save" small onPress={saveEdit} loading={busy} disabled={!title.trim()} />
             <Button title="Cancel" variant="plain" small onPress={() => setEditing(false)} disabled={busy} />
-            {isAdmin && (
-              <Button
-                title="Delete"
-                icon="trash-2"
-                variant="plain"
-                small
-                disabled={busy}
-                onPress={() => run(supabase.from('questions').delete().eq('id', question.id))}
-              />
-            )}
           </View>
         </>
       )}
@@ -433,7 +414,14 @@ function SolutionBox({ solution, asker, canMark, canEdit, busy, run }: SolutionP
         <ThemedText type="small" themeColor="textSecondary">
           {shortDate(solution.created_at)}
         </ThemedText>
-        {canEdit && !editing && <IconButton icon="edit-2" label="Edit solution" onPress={() => setEditing(true)} />}
+        {canEdit && !editing && (
+          <MoreMenu
+            actions={[
+              { title: 'Edit', onPress: () => setEditing(true) },
+              { title: 'Delete', danger: true, confirm: true, disabled: busy, onPress: () => run(supabase.from('solutions').delete().eq('id', solution.id)) },
+            ]}
+          />
+        )}
       </View>
 
       {editing ? (
@@ -442,14 +430,6 @@ function SolutionBox({ solution, asker, canMark, canEdit, busy, run }: SolutionP
           <View style={styles.row}>
             <Button title="Save" small onPress={save} loading={busy} disabled={!body.trim()} />
             <Button title="Cancel" variant="plain" small onPress={() => setEditing(false)} disabled={busy} />
-            <Button
-              title="Delete"
-              icon="trash-2"
-              variant="plain"
-              small
-              disabled={busy}
-              onPress={() => run(supabase.from('solutions').delete().eq('id', solution.id))}
-            />
           </View>
         </>
       ) : (

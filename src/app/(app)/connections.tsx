@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, Card, Chip, ErrorText, Field, TextButton } from '@/components/ui';
+import { Avatar, Button, Card, Chip, ErrorText, Field, TextButton, MoreMenu } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { acceptConnection, askToConnect, type MyPerson, removeConnection, startChat, unblockPerson, useMyPeople } from '@/lib/direct';
@@ -24,7 +24,6 @@ export default function ConnectionsScreen() {
   const { people, loading, error, reload } = useMyPeople();
   const [failed, setFailed] = useState<string | null>(null);
   // Removing takes two presses, so a slip does nothing.
-  const [confirming, setConfirming] = useState<string | null>(null);
   const { profile, session } = useAuth();
   const blocks = useRows<{ blocked: string; profile: { full_name: string } | null }>('blocks', () =>
     supabase
@@ -44,7 +43,6 @@ export default function ConnectionsScreen() {
   async function run(action: Result) {
     const result = await action;
     setFailed(result.error?.message ?? null);
-    setConfirming(null);
     reload();
     blocks.reload();
   }
@@ -128,11 +126,9 @@ export default function ConnectionsScreen() {
               person,
               <>
                 <Button title="Message" icon="message-circle" small variant="secondary" onPress={() => message(person.user_id)} />
-                {confirming === person.user_id ? (
-                  <TextButton title="Yes, remove" danger onPress={() => run(removeConnection(person.connection_id as string))} />
-                ) : (
-                  <TextButton title="Remove" danger onPress={() => setConfirming(person.user_id)} />
-                )}
+                <MoreMenu
+                  actions={[{ title: 'Remove', danger: true, confirm: true, onPress: () => run(removeConnection(person.connection_id as string)) }]}
+                />
               </>,
             ),
           )}

@@ -11,12 +11,13 @@ import {
 
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, EditedLabel, ErrorText, TextButton } from '@/components/ui';
+import { Avatar, Button, EditedLabel, ErrorText, TextButton, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { locale, tr } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { keptChats } from '@/lib/use-rows';
 
 type Message = {
   id: string;
@@ -71,6 +72,9 @@ async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined
   };
 }
 
+/** The messages of chats opened earlier. */
+const seen = keptChats as Map<string, Loaded>;
+
 const time = (iso: string) =>
   new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -81,7 +85,9 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
   const userId = session?.user.id;
   const list = useRef<FlatList<Message>>(null);
 
-  const [data, setData] = useState<Loaded | null>(null);
+  // A chat that was open before shows its messages at once, then is brought up to date.
+  const memory = direct ?? info?.subgroup?.id ?? info?.project.id ?? '';
+  const [data, setData] = useState<Loaded | null>(() => seen.get(memory) ?? null);
   const [version, setVersion] = useState(0);
   const [text, setText] = useState('');
   const [editing, setEditing] = useState<Message | null>(null);
@@ -94,6 +100,7 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
   useEffect(() => {
     let active = true;
     fetchChat(info, direct).then((result) => {
+      if (!result.error) seen.set(memory, result);
       if (active) setData(result);
     });
     return () => {
@@ -196,16 +203,18 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
                 {!deleted && <EditedLabel name={item.editor?.full_name ?? null} at={item.edited_at} />}
                 <View style={styles.meta}>
                   {!deleted && ((mine && open) || info?.isAdmin) && (
-                    <>
-                      <TextButton
-                        title="Edit"
-                        onPress={() => {
-                          setEditing(item);
-                          setText(item.body ?? '');
-                        }}
-                      />
-                      <TextButton title="Delete" danger onPress={() => remove(item)} />
-                    </>
+                    <MoreMenu
+                      actions={[
+                        {
+                          title: 'Edit',
+                          onPress: () => {
+                            setEditing(item);
+                            setText(item.body ?? '');
+                          },
+                        },
+                        { title: 'Delete', danger: true, confirm: true, onPress: () => remove(item) },
+                      ]}
+                    />
                   )}
                   <ThemedText type="small" themeColor="textSecondary" style={styles.time}>
                     {time(item.created_at)}

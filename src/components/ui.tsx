@@ -1,5 +1,5 @@
 import Feather from '@expo/vector-icons/Feather';
-import { type ComponentProps, type ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -212,6 +212,7 @@ const styles = StyleSheet.create({
   buttonSmall: { minHeight: 40, paddingHorizontal: 14, borderRadius: Radius.small },
   seg: { flexDirection: 'row', borderRadius: 12, padding: 4, gap: 2, alignSelf: 'flex-start' },
   segItem: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 9 },
+  more: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.three, borderWidth: 1, borderRadius: 12, paddingLeft: Spacing.three, paddingRight: 2 },
   iconButton: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 },
@@ -314,6 +315,46 @@ export function IconButton(props: { icon: IconName; label: string; onPress: () =
       style={({ pressed }) => [styles.iconButton, { opacity: props.disabled ? 0.3 : pressed ? 0.6 : 1 }]}>
       <Icon name={props.icon} size={19} color={props.color} />
     </Pressable>
+  );
+}
+
+export type MenuAction = { title: string; onPress: () => void; danger?: boolean; disabled?: boolean; confirm?: boolean };
+
+/**
+ * The three-dots button: Edit, Delete and the like stay behind it until it is pressed.
+ * An action with `confirm` asks once more before it runs.
+ */
+export function MoreMenu({ actions, label = 'More actions' }: { actions: (MenuAction | false | null | undefined)[]; label?: string }) {
+  const theme = useTheme();
+  const [open, setOpen] = useState(false);
+  const [sure, setSure] = useState<string | null>(null);
+  const shown = actions.filter((a): a is MenuAction => !!a);
+  if (shown.length === 0) return null;
+  const close = () => {
+    setOpen(false);
+    setSure(null);
+  };
+  if (!open) return <IconButton icon="more-vertical" label={label} onPress={() => setOpen(true)} />;
+  return (
+    <View style={[styles.more, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      {shown.map((action) => (
+        <TextButton
+          key={action.title}
+          title={sure === action.title ? 'Yes, I am sure' : action.title}
+          danger={action.danger}
+          disabled={action.disabled}
+          onPress={() => {
+            if (action.confirm && sure !== action.title) {
+              setSure(action.title);
+              return;
+            }
+            close();
+            action.onPress();
+          }}
+        />
+      ))}
+      <IconButton icon="x" label="Close" onPress={close} />
+    </View>
   );
 }
 
