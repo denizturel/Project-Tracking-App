@@ -5,6 +5,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { Chat } from '@/components/space/chat';
 import { Overview } from '@/components/space/overview';
 import { People } from '@/components/space/people';
+import { Questions } from '@/components/space/questions';
+import { Schedule } from '@/components/space/schedule';
+import { Tasks } from '@/components/space/tasks';
 import { ThemedText } from '@/components/themed-text';
 import { ComingNext, ErrorText } from '@/components/ui';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -88,7 +91,10 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
           <View style={styles.column}>
             {inner === 'Overview' && <Overview info={info} />}
             {inner === 'People' && <People info={info} />}
-            {inner !== 'Overview' && inner !== 'People' && <ComingNext what={inner} />}
+            {inner === 'Tasks' && <Tasks info={info} />}
+            {inner === 'Schedule' && <Schedule info={info} />}
+            {inner === 'Questions & solutions' && <Questions info={info} />}
+            {inner === 'Media, links, docs' && <ComingNext what={inner} />}
           </View>
         </ScrollView>
       )}
