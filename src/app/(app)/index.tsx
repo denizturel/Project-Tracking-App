@@ -281,7 +281,7 @@ const COMPANY_ROLES = [
   { value: 'guest', label: 'Guest' },
 ] as const;
 
-/** Who is in the company space. Owners and company admins choose who is a company admin, manager or staff. */
+/** Who is in the company space. Only the owner changes people's company status. */
 function CompanyPeople({ company }: { company: CompanyNode }) {
   const { session } = useAuth();
   const me = session?.user.id;
@@ -323,9 +323,9 @@ function CompanyPeople({ company }: { company: CompanyNode }) {
     <Card tint="lavender">
       <ThemedText type="subtitle">People of {company.name}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        Whoever creates the company space is its owner. Company admins see and manage every project, group and
-        team and create new projects. Managers see every project, group and team but do not manage them. Staff
-        and guests see only what they were added to.
+        The owner created the company space and is the only one who changes these statuses. Company admins
+        create, edit and delete projects and are admins inside every project. Managers see every project but do
+        not manage them. Staff and guests see only what they were added to.
       </ThemedText>
       <ErrorText>{failed ?? error}</ErrorText>
       {people.map((person) => (
@@ -342,7 +342,7 @@ function CompanyPeople({ company }: { company: CompanyNode }) {
               </ThemedText>
             </View>
           </View>
-          {person.user_id !== me && person.role !== 'owner' && (
+          {company.role === 'owner' && person.user_id !== me && person.role !== 'owner' && (
             <Choices options={COMPANY_ROLES} value={person.role} onChange={(role) => setRole(person.user_id, role)} />
           )}
         </View>

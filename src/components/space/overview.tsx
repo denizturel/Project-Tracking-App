@@ -585,10 +585,13 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
   const { subgroups } = useWorkspace();
   // The page header's "Edit group" button opens the form through the address.
   const params = useLocalSearchParams<{ edit?: string }>();
-  const { reload } = useWorkspace();
+  const { reload, companies } = useWorkspace();
   const { project, subgroup, parent, level, isAdmin, isProjectAdmin } = info;
-  // A group's own admin manages its teams but cannot delete the group itself.
-  const canDelete = !!subgroup && info.isFullAdmin && (level === 'team' || isProjectAdmin);
+  const companyRole = companies.find((c) => c.id === project.company_id)?.role;
+  // A manager deletes teams but not their own group. Projects are deleted by the owner and company admins.
+  const canDelete = subgroup
+    ? info.isFullAdmin && (level === 'team' || isProjectAdmin)
+    : companyRole === 'owner' || companyRole === 'admin';
   const item = subgroup ?? project;
   const table = subgroup ? 'subgroups' : 'projects';
 
@@ -621,20 +624,21 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
   }
 
   async function remove() {
-    if (!subgroup) return;
     setBusy(true);
-    const { error: failed } = await supabase.from('subgroups').delete().eq('id', subgroup.id);
+    const { error: failed } = await supabase.from(table).delete().eq('id', item.id);
     setBusy(false);
     if (failed) {
       setError(failed.message);
       return;
     }
     reload();
-    router.replace(
-      parent
-        ? { pathname: '/group/[id]', params: { id: parent.id } }
-        : { pathname: '/project/[id]', params: { id: project.id } },
-    );
+    if (!subgroup) router.dismissTo('/');
+    else
+      router.replace(
+        parent
+          ? { pathname: '/group/[id]', params: { id: parent.id } }
+          : { pathname: '/project/[id]', params: { id: project.id } },
+      );
   }
 
   if (editing) {
@@ -674,7 +678,7 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
       {isAdmin && (
         <View style={styles.actions}>
           <Button
-            title={level === 'project' ? 'Edit description' : `Edit ${level}`}
+            title={`Edit ${level}`}
             icon="edit-2"
             small
             variant="secondary"
@@ -686,7 +690,7 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
           {canDelete && confirmDelete && (
             <>
               <TextButton
-                title={`Yes, delete it with its chat${level === 'group' ? ' and teams' : ''}`}
+                title={`Yes, delete it with its chat${level === 'group' ? ' and teams' : level === 'project' ? ', groups and teams' : ''}`}
                 danger
                 onPress={remove}
                 disabled={busy}
