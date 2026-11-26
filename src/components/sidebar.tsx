@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { markOf } from '@/components/space/overview';
+import { GROUP_TABS, PROJECT_TABS, TEAM_TABS } from '@/components/space/space';
 import { Avatar, Icon, type IconName, TextButton } from '@/components/ui';
 import { Spacing, type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -10,19 +12,19 @@ import { useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 
-const MARKS: ThemeColor[] = ['primary', 'lavenderInk', 'ok', 'skyInk', 'warn'];
-
-/** The sections of a project, shown under the project that is open. */
-export const PROJECT_SECTIONS: { tab: string; icon: IconName }[] = [
-  { tab: 'Overview', icon: 'grid' },
-  { tab: 'Chat', icon: 'message-square' },
-  { tab: 'Tasks', icon: 'check-square' },
-  { tab: 'Schedule', icon: 'calendar' },
-  { tab: 'Questions & solutions', icon: 'help-circle' },
-  { tab: 'Training', icon: 'book-open' },
-  { tab: 'Media, links, docs', icon: 'image' },
-  { tab: 'People', icon: 'users' },
-];
+const ICONS: Record<string, IconName> = {
+  Overview: 'grid',
+  Chat: 'message-square',
+  Tasks: 'list',
+  Schedule: 'calendar',
+  'Questions & solutions': 'help-circle',
+  Training: 'book-open',
+  'Media, links, docs': 'image',
+  People: 'users',
+};
+// The list of groups and teams is the menu itself, so those two tabs are left out here.
+const sections = (tabs: string[]) => tabs.filter((tab) => tab !== 'Groups' && tab !== 'Teams');
+const CHAT_PARTS = ['Chat', 'Media, links, docs', 'People', 'Schedule'];
 
 /** Folding tree: each company > its projects > their sections and groups > teams, then "You". */
 export function Sidebar() {
@@ -30,7 +32,7 @@ export function Sidebar() {
   const { profile, signOut } = useAuth();
   const lock = useAppLock();
   const [lockError, setLockError] = useState<string | null>(null);
-  const { companies, projects, subgroups, loading } = useWorkspace();
+  const { companies, projects, subgroups, adminSubgroups, loading } = useWorkspace();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ tab?: string }>();
@@ -47,6 +49,17 @@ export function Sidebar() {
   // The project being looked at, also when a group or team inside it is open.
   const openGroup = subgroups.find((s) => pathname === `/group/${s.id}`);
   const activeProject = openGroup?.project_id ?? projects.find((p) => pathname === `/project/${p.id}`)?.id;
+  const currentTab = typeof params.tab === 'string' ? params.tab : 'Overview';
+  const projectHasTeams = (id: string) => subgroups.some((s) => s.project_id === id && s.parent_id);
+  // In the simple layout Tasks opens from Overview, and media, people and schedule sit inside Chat.
+  const leafActive = (tab: string, simple: boolean) =>
+    simple
+      ? tab === 'Chat'
+        ? CHAT_PARTS.includes(currentTab)
+        : tab === 'Overview'
+          ? currentTab === 'Overview' || currentTab === 'Tasks'
+          : currentTab === tab
+      : currentTab === tab;
 
   return (
     <ScrollView style={{ backgroundColor: theme.rail }} contentContainerStyle={styles.content}>
@@ -112,52 +125,106 @@ export function Sidebar() {
                     folded={!!folded[project.id]}
                     onToggle={() => toggle(project.id)}
                   />
-                  {!folded[project.id] && isActive && (
-                    <View style={[styles.branch, { borderLeftColor: theme.border }]}>
-                      {PROJECT_SECTIONS.map((section) => (
-                        <Row
-                          key={section.tab}
-                          href={{ pathname: '/project/[id]', params: { id: project.id, tab: section.tab } }}
-                          label={section.tab}
-                          icon={section.icon}
-                          depth={0}
-                          active={pathname === projectPath && (params.tab ?? 'Overview') === section.tab}
-                        />
-                      ))}
-                    </View>
-                  )}
                   {!folded[project.id] && (
                     <View style={[styles.branch, { borderLeftColor: theme.border }]}>
-                      {groups.map((group, index) => {
+                      {isActive &&
+                        sections(PROJECT_TABS).map((tab) => (
+                          <Row
+                            key={tab}
+                            href={{ pathname: '/project/[id]', params: { id: project.id, tab } }}
+                            label={tab === 'Chat' ? 'Group chat' : tab}
+                            icon={ICONS[tab]}
+                            depth={0}
+                            active={pathname === projectPath && currentTab === tab}
+                          />
+                        ))}
+                      {isActive && groups.length > 0 && <View style={styles.gap} />}
+                      {groups.map((group) => {
                         const teams = subgroups.filter((s) => s.parent_id === group.id);
+                        const groupHere = pathname === `/group/${group.id}`;
+                        const teamHere = teams.some((t) => pathname === `/group/${t.id}`);
+                        const groupSimple = !projectHasTeams(project.id);
+                        const open = folded[group.id] === undefined ? groupHere || teamHere : !folded[group.id];
                         return (
                           <View key={group.id}>
                             <Row
                               href={{ pathname: '/group/[id]', params: { id: group.id } }}
                               label={group.name}
                               depth={0}
-                              mark={MARKS[index % MARKS.length]}
-                              active={pathname === `/group/${group.id}`}
-                              folded={teams.length > 0 ? !!folded[group.id] : undefined}
-                              onToggle={() => toggle(group.id)}
+                              mark={markOf(subgroups, group)}
+                              active={groupHere}
+                              folded={!open}
+                              onToggle={() => setFolded((f) => ({ ...f, [group.id]: open }))}
                             />
-                            {!folded[group.id] && teams.length > 0 && (
+                            {open && (
                               <View style={[styles.branch, { borderLeftColor: theme.border }]}>
-                                {teams.map((team) => (
+                                {groupHere &&
+                                  sections(groupSimple ? TEAM_TABS : GROUP_TABS).map((tab) => (
+                                    <Row
+                                      key={tab}
+                                      href={{ pathname: '/group/[id]', params: { id: group.id, tab } }}
+                                      label={tab}
+                                      icon={ICONS[tab]}
+                                      depth={0}
+                                      small
+                                      active={leafActive(tab, groupSimple)}
+                                    />
+                                  ))}
+                                {groupHere && teams.length > 0 && <View style={styles.gap} />}
+                                {teams.map((team) => {
+                                  const here = pathname === `/group/${team.id}`;
+                                  return (
+                                    <View key={team.id}>
+                                      <Row
+                                        href={{ pathname: '/group/[id]', params: { id: team.id } }}
+                                        label={team.name}
+                                        depth={0}
+                                        small
+                                        mark={markOf(subgroups, team)}
+                                        active={here}
+                                      />
+                                      {here && (
+                                        <View style={[styles.branch, { borderLeftColor: theme.border }]}>
+                                          {TEAM_TABS.map((tab) => (
+                                            <Row
+                                              key={tab}
+                                              href={{ pathname: '/group/[id]', params: { id: team.id, tab } }}
+                                              label={tab}
+                                              icon={ICONS[tab]}
+                                              depth={0}
+                                              small
+                                              active={leafActive(tab, true)}
+                                            />
+                                          ))}
+                                        </View>
+                                      )}
+                                    </View>
+                                  );
+                                })}
+                                {!groupSimple && (project.myRole === 'admin' || adminSubgroups.includes(group.id)) && (
                                   <Row
-                                    key={team.id}
-                                    href={{ pathname: '/group/[id]', params: { id: team.id } }}
-                                    label={team.name}
+                                    href={{ pathname: '/group/[id]', params: { id: group.id, tab: 'Teams' } }}
+                                    label="New team"
+                                    icon="plus"
                                     depth={0}
                                     small
-                                    active={pathname === `/group/${team.id}`}
+                                    active={false}
                                   />
-                                ))}
+                                )}
                               </View>
                             )}
                           </View>
                         );
                       })}
+                      {project.myRole === 'admin' && (
+                        <Row
+                          href={{ pathname: '/project/[id]', params: { id: project.id, tab: 'Groups' } }}
+                          label="New group"
+                          icon="plus"
+                          depth={0}
+                          active={pathname === projectPath && currentTab === 'Groups'}
+                        />
+                      )}
                     </View>
                   )}
                 </View>
@@ -273,6 +340,7 @@ const styles = StyleSheet.create({
   },
   active: { boxShadow: '0 1px 4px rgba(120, 60, 30, 0.08)' },
   mark: { width: 14, height: 14, borderRadius: 4 },
+  gap: { height: 8 },
   you: { marginTop: Spacing.four, paddingTop: Spacing.three, paddingHorizontal: 12, borderTopWidth: 1, gap: Spacing.two },
   person: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

@@ -113,13 +113,15 @@ type ButtonProps = {
   icon?: IconName;
   /** As wide as its text instead of the full row. */
   inline?: boolean;
+  /** Compact, for buttons inside cards and page headers. Always as wide as its text. */
+  small?: boolean;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'plain';
   loading?: boolean;
   disabled?: boolean;
 };
 
-export function Button({ title, icon, inline, onPress, variant = 'primary', loading, disabled }: ButtonProps) {
+export function Button({ title, icon, inline, small, onPress, variant = 'primary', loading, disabled }: ButtonProps) {
   const theme = useTheme();
   const off = disabled || loading;
   const background =
@@ -134,14 +136,15 @@ export function Button({ title, icon, inline, onPress, variant = 'primary', load
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        inline && styles.inline,
+        (inline || small) && styles.inline,
+        small && styles.buttonSmall,
         { backgroundColor: background, opacity: off ? 0.5 : pressed ? 0.8 : 1 },
       ]}>
       {loading ? (
         <ActivityIndicator color={color} />
       ) : (
         <>
-          {icon && <Feather name={icon} size={19} color={color} />}
+          {icon && <Feather name={icon} size={small ? 17 : 19} color={color} />}
           <ThemedText type="bold" style={{ color }}>
             {title}
           </ThemedText>
@@ -204,6 +207,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonSmall: { minHeight: 40, paddingHorizontal: 14, borderRadius: Radius.small },
+  seg: { flexDirection: 'row', borderRadius: 12, padding: 4, gap: 2, alignSelf: 'flex-start' },
+  segItem: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 9 },
+  iconButton: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choice: { borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, minHeight: 54 },
+  searchInput: { flex: 1, fontSize: 17, fontFamily: Type.body, paddingVertical: 10, outlineStyle: 'none' } as never,
+  pill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1, minWidth: 24, alignItems: 'center' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -261,5 +273,110 @@ export function ComingNext({ what }: { what: string }) {
         built yet.
       </ThemedText>
     </Card>
+  );
+}
+
+/** A row of choices where one is picked (List, Timeline, Calendar). */
+export function Segmented<T extends string>(props: { options: readonly T[]; value: T; onChange: (value: T) => void }) {
+  const theme = useTheme();
+  return (
+    <View accessibilityRole="tablist" style={[styles.seg, { backgroundColor: theme.backgroundElement }]}>
+      {props.options.map((option) => {
+        const active = option === props.value;
+        return (
+          <Pressable
+            key={option}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            onPress={() => props.onChange(option)}
+            style={[styles.segItem, active && [{ backgroundColor: theme.card }, styles.shadow]]}>
+            <ThemedText type="bold" themeColor={active ? 'text' : 'textSecondary'}>
+              {option}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** A button that is only an icon, with its meaning as the label for screen readers. */
+export function IconButton(props: { icon: IconName; label: string; onPress: () => void; color?: ThemeColor; disabled?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={props.label}
+      disabled={props.disabled}
+      onPress={props.onPress}
+      hitSlop={6}
+      style={({ pressed }) => [styles.iconButton, { opacity: props.disabled ? 0.3 : pressed ? 0.6 : 1 }]}>
+      <Icon name={props.icon} size={19} color={props.color} />
+    </Pressable>
+  );
+}
+
+/** Small rounded count next to a tab or menu row. */
+export function Pill({ text, tone = 'plain' }: { text: string; tone?: Tone }) {
+  const theme = useTheme();
+  const [background, ink] = TONES[tone];
+  return (
+    <View style={[styles.pill, { backgroundColor: theme[background] }]}>
+      <ThemedText type="smallBold" style={{ color: theme[ink], fontSize: 13, lineHeight: 20 }}>
+        {text}
+      </ThemedText>
+    </View>
+  );
+}
+
+/** Round filter buttons; the chosen one is filled (Open, Done, All). */
+export function Choices<T extends string>(props: {
+  options: readonly (T | { value: T; label: string })[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.choices}>
+      {props.options.map((option) => {
+        const value = typeof option === 'string' ? option : option.value;
+        const label = typeof option === 'string' ? option : option.label;
+        const active = value === props.value;
+        return (
+          <Pressable
+            key={value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            onPress={() => props.onChange(value)}
+            style={[
+              styles.choice,
+              { backgroundColor: active ? theme.primary : theme.card, borderColor: active ? theme.primary : theme.border },
+            ]}>
+            <ThemedText type="smallBold" style={{ color: active ? theme.onPrimary : theme.textSecondary }}>
+              {label}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Search box with a magnifier, as in the prototype. */
+export function SearchField(props: { value: string; onChangeText: (text: string) => void; placeholder: string }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Icon name="search" />
+      <TextInput
+        accessibilityLabel={props.placeholder}
+        value={props.value}
+        onChangeText={props.onChangeText}
+        placeholder={props.placeholder}
+        placeholderTextColor={theme.textSecondary}
+        autoCapitalize="none"
+        style={[styles.searchInput, { color: theme.text }]}
+      />
+      {!!props.value && <IconButton icon="x" label="Clear search" onPress={() => props.onChangeText('')} />}
+    </View>
   );
 }

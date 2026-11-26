@@ -1,12 +1,12 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Tag } from '@/components/space/questions';
 import { inScope, personName, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, EditedLabel, ErrorText, Field, TextButton } from '@/components/ui';
+import { Button, Card, Chip, Choices, EditedLabel, ErrorText, Field, Icon, TextButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -61,9 +61,17 @@ const SELECT =
 
 type Action = PromiseLike<{ error: { message: string } | null }>;
 
+const FILTERS = ['Open', 'Done', 'All'] as const;
+const PRIORITY = { high: 0, medium: 1, low: 2 };
+const shortDate = (value: string) =>
+  new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+
 export function Tasks({ info }: { info: SpaceInfo }) {
+  const theme = useTheme();
   const { subgroups } = useWorkspace();
-  const [showDone, setShowDone] = useState(false);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Open');
+  const [adding, setAdding] = useState(false);
+  const twoColumns = useWindowDimensions().width >= 1240 && !info.simple;
 
   const { rows, loading, error, reload } = useRows<Task>(info.project.id, () =>
     supabase
@@ -75,48 +83,137 @@ export function Tasks({ info }: { info: SpaceInfo }) {
   );
 
   const mine = rows.filter((t) => inScope(info, subgroups, t.subgroup_id));
-  const open = mine.filter((t) => !t.completed_at);
-  const done = mine.filter((t) => t.completed_at);
+  const shown = mine
+    .filter((t) => filter === 'All' || (filter === 'Done' ? !!t.completed_at : !t.completed_at))
+    .sort(
+      (a, b) => Number(!!a.completed_at) - Number(!!b.completed_at) || PRIORITY[a.priority] - PRIORITY[b.priority],
+    );
+
+  // One bar for tasks of this page itself, then one for each group or team inside it.
+  const inside =
+    info.level === 'project'
+      ? subgroups.filter((s) => s.project_id === info.project.id && !s.parent_id)
+      : subgroups.filter((s) => s.parent_id === info.subgroup?.id);
+  const own = info.subgroup?.id ?? null;
+  const bars = [
+    { name: info.level === 'project' ? 'Whole project' : (info.subgroup?.name ?? ''), list: mine.filter((t) => t.subgroup_id === own) },
+    ...inside.map((place) => {
+      const ids = [place.id, ...subgroups.filter((s) => s.parent_id === place.id).map((s) => s.id)];
+      return { name: place.name, list: mine.filter((t) => ids.includes(t.subgroup_id ?? '')) };
+    }),
+  ].filter((bar) => bar.list.length > 0);
+  const upcoming = mine
+    .filter((t) => !t.completed_at && t.due_date)
+    .sort((a, b) => (a.due_date as string).localeCompare(b.due_date as string))
+    .slice(0, 4);
+
+  const side = (
+    <>
+      <Card>
+        <ThemedText type="label">Progress by {info.level === 'project' ? 'group' : 'team'}</ThemedText>
+        {bars.length === 0 && (
+          <ThemedText type="small" themeColor="textSecondary">
+            No tasks yet.
+          </ThemedText>
+        )}
+        {bars.map((bar) => {
+          const done = bar.list.filter((t) => t.completed_at).length;
+          return (
+            <View key={bar.name} style={{ gap: 6 }}>
+              <View style={styles.between}>
+                <ThemedText type="bold" numberOfLines={1} style={styles.grow}>
+                  {bar.name}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {done}/{bar.list.length} done
+                </ThemedText>
+              </View>
+              <View style={[styles.bar, { backgroundColor: theme.backgroundElement }]}>
+                <View
+                  style={[
+                    styles.barFill,
+                    { backgroundColor: theme.primary, width: `${Math.max((done / bar.list.length) * 100, 3)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          );
+        })}
+      </Card>
+      <Card>
+        <ThemedText type="label">Coming up</ThemedText>
+        {upcoming.length === 0 && (
+          <ThemedText type="small" themeColor="textSecondary">
+            No open tasks with a due date.
+          </ThemedText>
+        )}
+        <View>
+          {upcoming.map((task, index) => (
+            <View key={task.id} style={[styles.upcoming, index > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
+              <Chip text={shortDate(task.due_date as string)} tone="sky" />
+              <View style={styles.grow}>
+                <ThemedText type="bold" numberOfLines={1}>
+                  {task.title}
+                </ThemedText>
+                {placeName(info, subgroups, task.subgroup_id) && (
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {placeName(info, subgroups, task.subgroup_id)}
+                  </ThemedText>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      </Card>
+    </>
+  );
 
   return (
-    <>
-      <ThemedText type="subtitle">Tasks</ThemedText>
-      {!info.isAdmin && (
-        <ThemedText type="small" themeColor="textSecondary">
-          Admins create tasks and tick them off. Everyone can add notes.
-        </ThemedText>
-      )}
-      {info.isAdmin && <NewTask info={info} onSaved={reload} />}
-      <ErrorText>{error}</ErrorText>
+    <View style={twoColumns ? styles.columns : styles.stack}>
+      <View style={[styles.stack, twoColumns && styles.grow]}>
+        <View style={styles.between}>
+          <Choices options={FILTERS} value={filter} onChange={setFilter} />
+          {info.isAdmin && <Button title="New task" icon="plus" small onPress={() => setAdding(true)} />}
+        </View>
+        {!info.isAdmin && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Admins create tasks and tick them off. Everyone can add notes.
+          </ThemedText>
+        )}
+        {adding && <NewTask info={info} onSaved={reload} onClose={() => setAdding(false)} />}
+        <ErrorText>{error}</ErrorText>
 
-      {!loading && open.length === 0 && <ThemedText themeColor="textSecondary">No open tasks.</ThemedText>}
-      {open.map((task) => (
-        <TaskCard key={task.id} task={task} info={info} place={placeName(info, subgroups, task.subgroup_id)} onChanged={reload} />
-      ))}
-
-      {done.length > 0 && (
-        <TextButton
-          title={showDone ? `Hide finished tasks (${done.length})` : `Show finished tasks (${done.length})`}
-          onPress={() => setShowDone(!showDone)}
-        />
-      )}
-      {showDone &&
-        done.map((task) => (
-          <TaskCard key={task.id} task={task} info={info} place={placeName(info, subgroups, task.subgroup_id)} onChanged={reload} />
-        ))}
-    </>
+        <Card style={styles.list}>
+          {!loading && shown.length === 0 && (
+            <ThemedText themeColor="textSecondary" style={styles.empty}>
+              No tasks here.
+            </ThemedText>
+          )}
+          {shown.map((task, index) => (
+            <View key={task.id} style={index > 0 && { borderTopWidth: 1, borderTopColor: theme.border }}>
+              <TaskCard
+                task={task}
+                info={info}
+                place={task.subgroup_id === own ? null : (placeName(info, subgroups, task.subgroup_id) ?? null)}
+                onChanged={reload}
+              />
+            </View>
+          ))}
+        </Card>
+        {!twoColumns && !info.simple && side}
+      </View>
+      {twoColumns && <View style={[styles.stack, styles.sideColumn]}>{side}</View>}
+    </View>
   );
 }
 
-function NewTask({ info, onSaved }: { info: SpaceInfo; onSaved: () => void }) {
-  const [open, setOpen] = useState(false);
+function NewTask({ info, onSaved, onClose }: { info: SpaceInfo; onSaved: () => void; onClose: () => void }) {
+  const [priority, setPriority] = useState<Task['priority']>('medium');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [due, setDue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!open) return <Button title="Add a task" icon="plus" inline onPress={() => setOpen(true)} />;
 
   async function save() {
     const dueDate = due.trim() ? parseDate(due) : null;
@@ -129,24 +226,26 @@ function NewTask({ info, onSaved }: { info: SpaceInfo; onSaved: () => void }) {
       title: title.trim(),
       description: description.trim() || null,
       due_date: dueDate,
+      priority,
     });
     setBusy(false);
     if (failed) return setError(failed.message);
-    setTitle('');
-    setDescription('');
-    setDue('');
-    setOpen(false);
     onSaved();
+    onClose();
   }
 
   return (
     <Card>
+      <ThemedText type="heading">New task</ThemedText>
       <Field label="Task" required value={title} onChangeText={setTitle} />
       <Field label="Detailed description" value={description} onChangeText={setDescription} multiline />
       <Field label="Due date (day.month.year)" value={due} onChangeText={setDue} placeholder="03.12.2026" />
+      <Choices options={PRIORITIES} value={priority} onChange={setPriority} />
       <ErrorText>{error}</ErrorText>
-      <Button title="Add task" onPress={save} loading={busy} disabled={!title.trim()} />
-      <Button title="Cancel" variant="plain" onPress={() => setOpen(false)} disabled={busy} />
+      <View style={styles.row}>
+        <Button title="Add task" small onPress={save} loading={busy} disabled={!title.trim()} />
+        <Button title="Cancel" variant="plain" small onPress={onClose} disabled={busy} />
+      </View>
     </Card>
   );
 }
@@ -220,28 +319,46 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
   }
 
   return (
-    <Card>
+    <View style={styles.task}>
       <View style={styles.head}>
         <Tick checked={done} enabled={isAdmin && !busy} label={task.title} onPress={() => tick('tasks', task.id, !done)} />
-        <Pressable accessibilityRole="button" style={styles.grow} onPress={() => setOpen(!open)}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          style={[styles.grow, { gap: 6 }]}
+          onPress={() => setOpen(!open)}>
           <ThemedText type="bold" style={done ? styles.struck : undefined}>
             {task.title}
           </ThemedText>
+          <View style={styles.tags}>
+            {task.priority === 'high' && !done && <Tag text="High priority" tone="warn" />}
+            {task.priority === 'low' && <Tag text="Low" tone="sky" />}
+            {place && <Tag text={place} tone={place === 'Whole project' ? 'accent' : 'lavender'} />}
+            {task.due_date && (
+              <ThemedText type="small" themeColor="textSecondary">
+                Due {shortDate(task.due_date)}
+              </ThemedText>
+            )}
+            {items.length > 0 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                · ☰ {ticked}/{items.length}
+              </ThemedText>
+            )}
+            {notes.length > 0 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                · {notes.length} note{notes.length === 1 ? '' : 's'}
+              </ThemedText>
+            )}
+            {done && <Tag text={`Ticked off by ${personName(task.ticker)}`} tone="ok" icon="check" />}
+          </View>
+          <EditedLabel name={task.edited_at ? personName(task.editor) : null} at={task.edited_at} />
         </Pressable>
-        <TextButton title={open ? 'Close' : 'Open'} onPress={() => setOpen(!open)} />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} />
       </View>
-
-      <View style={styles.tags}>
-        {place && <Tag text={place} tone="sky" />}
-        {task.due_date && <Tag text={`Due ${formatDate(task.due_date)}`} tone={done ? 'plain' : 'accent'} />}
-        {items.length > 0 && <Tag text={`${ticked} of ${items.length} steps`} tone="plain" />}
-        {notes.length > 0 && <Tag text={`${notes.length} note${notes.length === 1 ? '' : 's'}`} tone="plain" />}
-        {done && <Tag text={`✓ Ticked off by ${personName(task.ticker)}`} tone="ok" />}
-      </View>
-      <EditedLabel name={task.edited_at ? personName(task.editor) : null} at={task.edited_at} />
 
       {open && !editing && (
         <>
+          <ThemedText type="label">Detailed description</ThemedText>
           <ThemedText themeColor={task.description ? 'text' : 'textSecondary'}>
             {task.description || 'No detailed description.'}
           </ThemedText>
@@ -273,9 +390,7 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
 
       {open && (
         <>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            STEPS
-          </ThemedText>
+          <ThemedText type="label">Checklist</ThemedText>
           {items.map((step) => (
             <View key={step.id} style={styles.head}>
               <Tick
@@ -309,9 +424,7 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
             </>
           )}
 
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            NOTES
-          </ThemedText>
+          <ThemedText type="label">Notes</ThemedText>
           {notes.map((entry) => (
             <View key={entry.id} style={styles.note}>
               <ThemedText type="smallBold">
@@ -334,7 +447,7 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
         </>
       )}
       <ErrorText>{error}</ErrorText>
-    </Card>
+    </View>
   );
 }
 
@@ -362,9 +475,25 @@ export function Tick(props: { checked: boolean; enabled: boolean; label: string;
   );
 }
 
+const PRIORITIES = [
+  { value: 'high', label: 'High priority' },
+  { value: 'medium', label: 'Normal' },
+  { value: 'low', label: 'Low' },
+] as const;
+
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  grow: { flex: 1 },
+  stack: { gap: 18, minWidth: 0 },
+  columns: { flexDirection: 'row', gap: 18, alignItems: 'flex-start' },
+  sideColumn: { width: 340 },
+  between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' },
+  bar: { height: 8, borderRadius: 999, overflow: 'hidden' },
+  barFill: { height: 8, borderRadius: 999 },
+  upcoming: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  list: { paddingVertical: 4, paddingHorizontal: 14, gap: 0 },
+  empty: { paddingVertical: 18, textAlign: 'center' },
+  task: { paddingVertical: 14, gap: 12 },
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  grow: { flex: 1, minWidth: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexWrap: 'wrap' },
   tags: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
   struck: { textDecorationLine: 'line-through', opacity: 0.7 },
