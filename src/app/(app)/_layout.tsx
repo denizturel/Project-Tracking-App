@@ -58,15 +58,12 @@ export default function AppLayout() {
                     styles.topBar,
                     { paddingTop: insets.top + 6, backgroundColor: theme.card, borderBottomColor: theme.border },
                   ]}>
-                  {back ? (
-                    <IconButton icon="chevron-left" label="Back" onPress={navigation.goBack} />
-                  ) : (
-                    <View style={styles.topBarSide} />
-                  )}
+                  <IconButton icon="menu" label="Open menu" onPress={() => setOpenOn(page)} />
+                  {back && <IconButton icon="chevron-left" label="Back" onPress={navigation.goBack} />}
                   <ThemedText type="heading" numberOfLines={1} style={styles.topBarTitle}>
                     {options.title}
                   </ThemedText>
-                  <IconButton icon="menu" label="Open menu" onPress={() => setOpenOn(page)} />
+                  <View style={{ width: back ? 84 : 38 }} />
                 </View>
               ),
             }}>
@@ -115,7 +112,6 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     borderBottomWidth: 1,
   },
-  topBarSide: { width: 40 },
   topBarTitle: { flex: 1, textAlign: 'center' },
   closedRail: { width: 64, borderRightWidth: 1 },
   drawerRow: { flex: 1, flexDirection: 'row' },
