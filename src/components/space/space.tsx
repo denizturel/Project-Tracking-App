@@ -8,6 +8,7 @@ import { People } from '@/components/space/people';
 import { Questions } from '@/components/space/questions';
 import { Schedule } from '@/components/space/schedule';
 import { Tasks } from '@/components/space/tasks';
+import { Training } from '@/components/space/training';
 import { ThemedText } from '@/components/themed-text';
 import { ComingNext, ErrorText } from '@/components/ui';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -25,9 +26,9 @@ export type SpaceInfo = {
   isAdmin: boolean;
 };
 
-const FULL_TABS = ['Overview', 'Chat', 'Tasks', 'Schedule', 'Questions & solutions', 'Media, links, docs', 'People'];
+const FULL_TABS = ['Overview', 'Chat', 'Tasks', 'Schedule', 'Questions & solutions', 'Training', 'Media, links, docs', 'People'];
 // Teams are kept simple: media, people and schedule live inside Chat (decided by Deniz).
-const TEAM_TABS = ['Overview', 'Chat', 'Questions & solutions'];
+const TEAM_TABS = ['Overview', 'Chat', 'Questions & solutions', 'Training'];
 const TEAM_CHAT_TABS = ['Messages', 'Media, links, docs', 'People', 'Schedule'];
 
 export function Space(props: { projectId: string } | { subgroupId: string }) {
@@ -94,6 +95,7 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
             {inner === 'Tasks' && <Tasks info={info} />}
             {inner === 'Schedule' && <Schedule info={info} />}
             {inner === 'Questions & solutions' && <Questions info={info} />}
+            {inner === 'Training' && <Training info={info} />}
             {inner === 'Media, links, docs' && <ComingNext what={inner} />}
           </View>
         </ScrollView>
