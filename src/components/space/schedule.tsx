@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { parseDate, useRows } from '@/lib/use-rows';
 import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
+import { months as monthNames, weekdays } from '@/lib/i18n';
 
 export type Milestone = {
   id: string;
@@ -35,8 +36,7 @@ export type ScheduleView = (typeof SCHEDULE_VIEWS)[number];
 const DAY = 86_400_000;
 const toDate = (value: string) => new Date(`${value}T00:00:00`);
 const today = () => new Date(new Date().setHours(0, 0, 0, 0));
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const short = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
+const short = (d: Date) => `${d.getDate()} ${monthNames()[d.getMonth()].slice(0, 3)}`;
 
 type Status = 'done' | 'now' | 'next';
 
@@ -463,7 +463,7 @@ function Gantt({ list, onEdit }: ViewProps) {
         <View style={[styles.track, styles.monthRow]}>
           {months.map((d) => (
             <ThemedText key={+d} type="smallBold" themeColor="textSecondary" style={[styles.month, { left: at(d) }]}>
-              {MONTHS[d.getMonth()].slice(0, 3)}
+              {monthNames()[d.getMonth()].slice(0, 3)}
               {d.getMonth() === 0 ? ` ${d.getFullYear()}` : ''}
             </ThemedText>
           ))}
@@ -562,7 +562,7 @@ function MonthCalendar({ list, onEdit }: ViewProps) {
       <View style={styles.header}>
         <IconButton icon="chevron-left" label="Previous month" onPress={() => setMonth(new Date(year, index - 1, 1))} />
         <ThemedText type="heading">
-          {MONTHS[index]} {year}
+          {monthNames()[index]} {year}
           <ThemedText type="small" themeColor="textSecondary">
             {'  '}· {inMonth.length} item{inMonth.length === 1 ? '' : 's'}
           </ThemedText>
@@ -570,8 +570,8 @@ function MonthCalendar({ list, onEdit }: ViewProps) {
         <IconButton icon="chevron-right" label="Next month" onPress={() => setMonth(new Date(year, index + 1, 1))} />
       </View>
       <View style={styles.week}>
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name) => (
-          <ThemedText key={name} type="smallBold" themeColor="textSecondary" style={styles.dow}>
+        {weekdays().map((name) => (
+          <ThemedText key={name} raw type="smallBold" themeColor="textSecondary" style={styles.dow}>
             {narrow ? name[0] : name}
           </ThemedText>
         ))}

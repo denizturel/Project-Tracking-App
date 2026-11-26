@@ -2,24 +2,53 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, ErrorText, Field, Icon, type IconName } from '@/components/ui';
+import { Button, Card, Choices, ErrorText, Field, Icon, type IconName } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
+import { setLang, setMode, usePrefs } from '@/lib/prefs';
 import { WIDE_SCREEN } from '@/lib/workspace';
 import { supabase } from '@/lib/supabase';
 
-/** Settings: security and password (change password, phone unlock, delete account) and sign out. */
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'tr', label: 'Türkçe' },
+] as const;
+const MODES = [
+  { value: 'light', label: 'Day' },
+  { value: 'dark', label: 'Night' },
+  { value: 'system', label: 'Same as phone' },
+] as const;
+
+/** Settings: language, day or night mode, security and password (change password, phone unlock, delete account) and sign out. */
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const [security, setSecurity] = useState(false);
+  const prefs = usePrefs();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={styles.column}>
         {wide && <ThemedText type="title">Settings</ThemedText>}
+
+        <Card>
+          <View style={styles.setting}>
+            <Icon name="globe" size={24} color="primary" />
+            <ThemedText type="bold" style={styles.grow}>
+              Language
+            </ThemedText>
+            <Choices options={LANGUAGES} value={prefs.lang} onChange={setLang} />
+          </View>
+          <View style={styles.setting}>
+            <Icon name={prefs.mode === 'dark' ? 'moon' : 'sun'} size={24} color="primary" />
+            <ThemedText type="bold" style={styles.grow}>
+              Day or night mode
+            </ThemedText>
+            <Choices options={MODES} value={prefs.mode} onChange={setMode} />
+          </View>
+        </Card>
 
         <Card style={styles.list}>
           <MenuRow
@@ -181,6 +210,7 @@ function Security() {
 const styles = StyleSheet.create({
   page: { padding: Spacing.three, alignItems: 'center' },
   column: { width: '100%', maxWidth: 640, gap: Spacing.three },
+  setting: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexWrap: 'wrap' },
   list: { paddingVertical: Spacing.one },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.two },
   grow: { flex: 1, minWidth: 0 },

@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { formatDate, parseDate, useRows } from '@/lib/use-rows';
 import { useWorkspace } from '@/lib/workspace';
+import { locale } from '@/lib/i18n';
 
 type ChecklistItem = {
   id: string;
@@ -64,7 +65,7 @@ type Action = PromiseLike<{ error: { message: string } | null }>;
 const FILTERS = ['Open', 'Done', 'All'] as const;
 const PRIORITY = { high: 0, medium: 1, low: 2 };
 const shortDate = (value: string) =>
-  new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  new Date(`${value}T00:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 
 export function Tasks({ info }: { info: SpaceInfo }) {
   const theme = useTheme();
@@ -400,7 +401,7 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
                 onPress={() => tick('task_checklist_items', step.id, !step.completed_at)}
               />
               <View style={styles.grow}>
-                <ThemedText style={step.completed_at ? styles.struck : undefined}>{step.body}</ThemedText>
+                <ThemedText raw style={step.completed_at ? styles.struck : undefined}>{step.body}</ThemedText>
                 {step.completed_at && (
                   <ThemedText type="small" themeColor="textSecondary">
                     Ticked off by {personName(step.ticker)}
@@ -430,7 +431,7 @@ function TaskCard({ task, info, place, onChanged }: CardProps) {
               <ThemedText type="smallBold">
                 {personName(entry.author)} · {formatDate(entry.created_at)}
               </ThemedText>
-              <ThemedText>{entry.body}</ThemedText>
+              <ThemedText raw>{entry.body}</ThemedText>
               <EditedLabel name={entry.edited_at ? personName(entry.editor) : null} at={entry.edited_at} />
               {(isAdmin || entry.author_id === me) && (
                 <TextButton

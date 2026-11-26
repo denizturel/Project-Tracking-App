@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type CompanyNode, useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
+import { locale } from '@/lib/i18n';
 
 type MilestoneRow = { project_id: string; done: boolean };
 type TaskRow = { id: string; project_id: string; title: string; due_date: string | null };
@@ -18,7 +19,7 @@ type MemberRow = { project_id: string };
 
 const TINTS: ThemeColor[] = ['backgroundSelected', 'lavender', 'sky', 'mint', 'butter'];
 const shortDate = (value: string) =>
-  new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  new Date(`${value}T00:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** Home: every project as a card, with what is coming up next to them. */

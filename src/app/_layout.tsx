@@ -5,19 +5,19 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 
 import { LockScreen } from '@/components/lock-screen';
 import { useTheme } from '@/hooks/use-theme';
 import { AppLockProvider, useAppLock } from '@/lib/app-lock';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { usePrefs } from '@/lib/prefs';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="auto" />
       <AppLockProvider>
         <RootNavigator />
       </AppLockProvider>
@@ -29,6 +29,7 @@ function RootNavigator() {
   const { loading, session, profile } = useAuth();
   const theme = useTheme();
   const { locked } = useAppLock();
+  const { lang, mode, ready: prefsReady } = usePrefs();
 
   const [fontsReady, fontsFailed] = useFonts({
     Manrope_500Medium,
@@ -39,7 +40,7 @@ function RootNavigator() {
     ...Feather.font,
   });
   // If the fonts cannot load, carry on with the phone's own font.
-  const waiting = loading || (!fontsReady && !fontsFailed);
+  const waiting = loading || !prefsReady || (!fontsReady && !fontsFailed);
 
   useEffect(() => {
     if (!waiting) SplashScreen.hideAsync();
@@ -53,8 +54,12 @@ function RootNavigator() {
 
   return (
     <>
-      <Screens signedIn={signedIn} ready={ready} theme={theme} />
-      {signedIn && locked && <LockScreen />}
+      <StatusBar style={mode === 'system' ? 'auto' : mode === 'dark' ? 'light' : 'dark'} />
+      {/* A new language draws every screen again from the start. */}
+      <Fragment key={lang}>
+        <Screens signedIn={signedIn} ready={ready} theme={theme} />
+        {signedIn && locked && <LockScreen />}
+      </Fragment>
     </>
   );
 }

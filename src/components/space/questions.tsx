@@ -25,6 +25,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { useWorkspace } from '@/lib/workspace';
+import { locale } from '@/lib/i18n';
 
 type Solution = {
   id: string;
@@ -70,7 +71,7 @@ const STATUS = [
   { value: 'solved', label: 'Solved' },
   { value: 'open', label: 'Waiting for a solution' },
 ] as const;
-const shortDate = (value: string) => new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const shortDate = (value: string) => new Date(value).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 
 export function Questions({ info }: { info: SpaceInfo }) {
   const theme = useTheme();
@@ -453,7 +454,7 @@ function SolutionBox({ solution, asker, canMark, canEdit, busy, run }: SolutionP
         </>
       ) : (
         <>
-          <ThemedText>{solution.body}</ThemedText>
+          <ThemedText raw>{solution.body}</ThemedText>
           <EditedLabel name={solution.edited_at ? personName(solution.editor) : null} at={solution.edited_at} />
         </>
       )}

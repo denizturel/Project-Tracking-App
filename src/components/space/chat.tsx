@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, EditedLabel, ErrorText, TextButton } from '@/components/ui';
 import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { locale, tr } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
@@ -57,7 +58,7 @@ async function fetchChat(info: SpaceInfo): Promise<Loaded> {
 }
 
 const time = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Live chat of a project, group or team. */
 export function Chat({ info }: { info: SpaceInfo }) {
@@ -170,7 +171,7 @@ export function Chat({ info }: { info: SpaceInfo }) {
                     {item.sender?.full_name ?? 'Someone'}
                   </ThemedText>
                 )}
-                <ThemedText themeColor={deleted ? 'textSecondary' : 'text'} style={deleted && styles.deleted}>
+                <ThemedText raw={!deleted} themeColor={deleted ? 'textSecondary' : 'text'} style={deleted && styles.deleted}>
                   {deleted ? 'This message was deleted' : item.body}
                 </ThemedText>
                 {!deleted && <EditedLabel name={item.editor?.full_name ?? null} at={item.edited_at} />}
@@ -217,7 +218,7 @@ export function Chat({ info }: { info: SpaceInfo }) {
           <View style={styles.inputRow}>
             <TextInput
               accessibilityLabel="Message"
-              placeholder="Write a message"
+              placeholder={tr('Write a message')}
               placeholderTextColor={theme.textSecondary}
               value={text}
               onChangeText={setText}

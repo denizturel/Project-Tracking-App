@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Radius, Spacing, type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { tr } from '@/lib/i18n';
 
 /** Full-height scrolling page with the peach background and a centred column. */
 export function Screen({ children, centered }: { children: ReactNode; centered?: boolean }) {
@@ -170,6 +171,7 @@ export function Field({ label, required, ...rest }: TextInputProps & { label: st
           { backgroundColor: theme.card, borderColor: theme.border, color: theme.text },
         ]}
         {...rest}
+        placeholder={rest.placeholder ? tr(rest.placeholder) : undefined}
       />
     </View>
   );
@@ -371,7 +373,7 @@ export function SearchField(props: { value: string; onChangeText: (text: string)
         accessibilityLabel={props.placeholder}
         value={props.value}
         onChangeText={props.onChangeText}
-        placeholder={props.placeholder}
+        placeholder={tr(props.placeholder)}
         placeholderTextColor={theme.textSecondary}
         autoCapitalize="none"
         style={[styles.searchInput, { color: theme.text }]}

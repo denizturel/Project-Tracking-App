@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
+import { locale } from '@/lib/i18n';
 
 export const MARKS: ThemeColor[] = ['primary', 'lavenderInk', 'ok', 'skyInk', 'warn'];
 
@@ -26,7 +27,7 @@ type PersonRow = {
 };
 
 const shortDate = (value: string) =>
-  new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  new Date(`${value}T00:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 const daysUntil = (value: string) =>
   Math.round((new Date(`${value}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

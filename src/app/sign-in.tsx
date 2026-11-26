@@ -2,12 +2,19 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Button, Card, ErrorText, Field, Screen } from '@/components/ui';
+import { Button, Card, ErrorText, Field, Screen, Choices } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
+import { setLang, usePrefs } from '@/lib/prefs';
 import { supabase } from '@/lib/supabase';
 
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'tr', label: 'Türkçe' },
+] as const;
+
 export default function SignInScreen() {
+  const { lang } = usePrefs();
   const { signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [fullName, setFullName] = useState('');
@@ -70,6 +77,7 @@ export default function SignInScreen() {
         <ThemedText themeColor="textSecondary">
           Projects, chats, tasks and solutions for your team, in one place.
         </ThemedText>
+        <Choices options={LANGUAGES} value={lang} onChange={setLang} />
       </View>
 
       <Card>

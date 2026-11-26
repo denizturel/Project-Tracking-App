@@ -2,17 +2,24 @@ import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { trChildren } from '@/lib/i18n';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'bold' | 'title' | 'subtitle' | 'heading' | 'small' | 'smallBold' | 'link' | 'label' | 'number';
   themeColor?: ThemeColor;
+  /** Text typed by a person (a message, a note): shown as written, never translated. */
+  raw?: boolean;
 };
 
-export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
+export function ThemedText({ style, type = 'default', themeColor, raw, children, ...rest }: ThemedTextProps) {
   const theme = useTheme();
   const color = theme[themeColor ?? (type === 'link' ? 'primary' : type === 'label' ? 'textSecondary' : 'text')];
 
-  return <Text style={[{ color }, styles[type], style]} {...rest} />;
+  return (
+    <Text style={[{ color }, styles[type], style]} {...rest}>
+      {raw ? children : trChildren(children)}
+    </Text>
+  );
 }
 
 const styles = StyleSheet.create({

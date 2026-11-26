@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { locale } from '@/lib/i18n';
 
 type Result<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
@@ -33,7 +34,7 @@ export function useRows<T>(key: string, load: () => Result<T>) {
 export function formatDate(value: string | null) {
   if (!value) return '';
   const date = new Date(value.length === 10 ? `${value}T00:00:00` : value);
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return date.toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /** Accepts 2026-12-03 or 03.12.2026 / 03/12/2026 and returns 2026-12-03, or null when it is not a date. */
