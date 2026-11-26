@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon } from '@/components/ui';
 import { Spacing, type ThemeColor, WideContentWidth } from '@/constants/theme';
@@ -215,12 +214,6 @@ export default function HomeScreen() {
               ))}
               {!loading && <NewCompany first={companies.length === 0} />}
             </View>
-
-            {!wide && (
-              <View style={{ borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: theme.border }}>
-                <Sidebar />
-              </View>
-            )}
           </View>
           {twoColumns && <View style={[styles.stack, styles.sideColumn]}>{side}</View>}
         </View>
