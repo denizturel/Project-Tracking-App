@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Switch, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import { ScheduleCard, type ScheduleView, dateText, statusOf, useMilestones } from '@/components/space/schedule';
 import { inScope, placeName } from '@/components/space/scope';
@@ -46,7 +46,7 @@ export function markOf(subgroups: SubgroupNode[], item: SubgroupNode): ThemeColo
 export function Overview({ info }: { info: SpaceInfo }) {
   const theme = useTheme();
   const router = useRouter();
-  const { subgroups, reload } = useWorkspace();
+  const { subgroups } = useWorkspace();
   const { project, subgroup, level, isAdmin } = info;
   const width = useWindowDimensions().width;
   const twoColumns = width >= 1240;
@@ -111,11 +111,6 @@ export function Overview({ info }: { info: SpaceInfo }) {
   const peopleHere = subgroup
     ? placed.rows.filter((p, i, all) => tree.includes(p.subgroup_id ?? '') && all.findIndex((x) => x.user_id === p.user_id && tree.includes(x.subgroup_id ?? '')) === i)
     : members.rows;
-
-  async function setRestricted(value: boolean) {
-    await supabase.from('projects').update({ restrict_to_subgroups: value }).eq('id', project.id);
-    reload();
-  }
 
   const taskList = (title: string, withButton: boolean) => (
     <Card>
@@ -376,26 +371,6 @@ export function Overview({ info }: { info: SpaceInfo }) {
           onView={setView}
           onChanged={milestones.reload}
         />
-
-        {level === 'project' && isAdmin && (
-          <Card>
-            <View style={styles.line}>
-              <View style={[styles.grow, { gap: Spacing.half }]}>
-                <ThemedText type="bold">People only see their own groups</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  When on, staff see only their own team, group managers see their whole group, and admins see
-                  everything. Everyone still sees the group chat and all questions and solutions.
-                </ThemedText>
-              </View>
-              <Switch
-                accessibilityLabel="People only see their own groups"
-                value={project.restrict_to_subgroups}
-                onValueChange={setRestricted}
-                trackColor={{ true: theme.primary, false: theme.border }}
-              />
-            </View>
-          </Card>
-        )}
 
         {!twoColumns && side}
       </View>

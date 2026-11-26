@@ -55,35 +55,35 @@ async function fetchPeople(info: SpaceInfo, subgroupIds: string[]): Promise<Load
   };
 }
 
-type Run = (action: PromiseLike<{ error: { message: string } | null }>) => Promise<void>;
-type Role = 'admin' | 'manager' | 'member';
+type Result = { error: { message: string } | null };
+type Status = 'admin' | 'manager' | 'member';
 
-const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', manager: 'Manager', member: 'Staff' };
-const PLACE_ROLES = (['admin', 'manager', 'member'] as const).map((value) => ({ value, label: ROLE_LABEL[value] }));
-const PROJECT_ROLES = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'member', label: 'Staff' },
-] as const;
+const STATUS_LABEL: Record<Status, string> = { admin: 'Admin', manager: 'Manager', member: 'Staff' };
+const STATUS_HINT: Record<Status, string> = {
+  admin: 'Manages every group, team and person in the project.',
+  manager: 'Manages one group, the teams inside it and their staff.',
+  member: 'Sees their own team and their group, not other teams.',
+};
+const STATUSES = (['admin', 'manager', 'member'] as const).map((value) => ({ value, label: STATUS_LABEL[value] }));
+const leads = (role: string | undefined) => role === 'admin' || role === 'manager';
 
 /**
- * One simple list of who is here. Clicking a person opens their profile card,
- * where admins and managers change their status, add them to groups or remove them.
+ * One simple list of who is here. Clicking a person opens their profile card.
+ * Each person has one status: Admin (whole project), Manager (of a group) or Staff.
  */
 export function People({ info }: { info: SpaceInfo }) {
   const theme = useTheme();
   const { session } = useAuth();
   const me = session?.user.id;
-  const { subgroups } = useWorkspace();
+  const { subgroups, reload } = useWorkspace();
   const { project, subgroup, isAdmin, isProjectAdmin } = info;
-  const full = info.isFullAdmin;
 
   const all = subgroups.filter((s) => s.project_id === project.id);
+  const groups = all.filter((s) => !s.parent_id);
   const kids = (id: string) => all.filter((s) => s.parent_id === id);
   const idsKey = all.map((s) => s.id).join(',');
   // The places this page covers: the whole project, a group with its teams, or one team.
-  const scope = subgroup
-    ? [subgroup, ...kids(subgroup.id)]
-    : all.filter((s) => !s.parent_id).flatMap((group) => [group, ...kids(group.id)]);
+  const scope = subgroup ? [subgroup, ...kids(subgroup.id)] : groups.flatMap((group) => [group, ...kids(group.id)]);
 
   const [data, setData] = useState<Loaded | null>(null);
   const [version, setVersion] = useState(0);
@@ -104,33 +104,46 @@ export function People({ info }: { info: SpaceInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info.project.id, info.isAdmin, idsKey, version]);
 
-  const run: Run = async (action) => {
-    const { error: failed } = await action;
-    setError(failed?.message ?? null);
+  /** Runs the steps one after another and stops at the first that fails. */
+  const run = async (...steps: (() => PromiseLike<Result>)[]) => {
+    let failed: string | null = null;
+    for (const step of steps) {
+      const { error: stepError } = await step();
+      if (stepError) {
+        failed = stepError.message;
+        break;
+      }
+    }
+    setError(failed);
     refresh();
+    reload();
   };
 
   if (!data) return <ActivityIndicator color={theme.primary} size="large" />;
 
-  const inScope = data.placed.filter((p) => scope.some((s) => s.id === p.subgroup_id));
   const projectRole = new Map(data.project.map((p) => [p.user_id, p.role]));
-  const people = subgroup
-    ? data.project.filter((p) => inScope.some((h) => h.user_id === p.user_id))
-    : data.project;
-  const placesOf = (userId: string) => inScope.filter((p) => p.user_id === userId);
-  const nameOf = (id: string | undefined) => scope.find((s) => s.id === id)?.name ?? '';
-  // A manager manages the people of their own group or team only, and cannot make admins.
-  const canManage = (item: SubgroupNode) => full || (isAdmin && item.id === subgroup?.id);
-
-  const statusOf = (userId: string) => {
-    if (projectRole.get(userId) === 'admin') return 'Admin';
-    const roles = placesOf(userId).map((p) => p.role);
-    return roles.includes('admin') ? 'Group admin' : roles.includes('manager') ? 'Manager' : 'Staff';
-  };
+  const placedOf = (userId: string) => data.placed.filter((p) => p.user_id === userId);
+  const inScope = (userId: string) => placedOf(userId).filter((p) => scope.some((s) => s.id === p.subgroup_id));
+  const people = subgroup ? data.project.filter((p) => inScope(p.user_id).length > 0) : data.project;
+  const nameOf = (id: string | undefined) => all.find((s) => s.id === id)?.name ?? '';
+  /** The groups this person manages. */
+  const managedBy = (userId: string) =>
+    groups.filter((group) => placedOf(userId).some((p) => p.subgroup_id === group.id && leads(p.role)));
+  const statusOf = (userId: string): Status =>
+    projectRole.get(userId) === 'admin' ? 'admin' : managedBy(userId).length ? 'manager' : 'member';
 
   const open = people.find((p) => p.user_id === openId) ?? null;
-  const notHere = subgroup ? data.project.filter((p) => !placesOf(p.user_id).some((h) => h.subgroup_id === subgroup.id)) : [];
-  const word = subgroup?.parent_id ? 'team' : 'group';
+  const notHere = subgroup ? data.project.filter((p) => !placedOf(p.user_id).some((h) => h.subgroup_id === subgroup.id)) : [];
+
+  const setProjectRole = (userId: string, role: 'admin' | 'member') => () =>
+    supabase.from('project_members').update({ role }).eq('project_id', project.id).eq('user_id', userId);
+  const setPlaceRole = (userId: string, placeId: string, role: 'manager' | 'member') => () =>
+    supabase.from('subgroup_members').upsert({ subgroup_id: placeId, user_id: userId, role }, { onConflict: 'subgroup_id,user_id' });
+  /** Takes the Manager status away everywhere in this project. */
+  const noLongerManager = (userId: string, except?: string) =>
+    placedOf(userId)
+      .filter((p) => leads(p.role) && p.subgroup_id !== except)
+      .map((p) => setPlaceRole(userId, p.subgroup_id as string, 'member'));
 
   return (
     <>
@@ -143,17 +156,21 @@ export function People({ info }: { info: SpaceInfo }) {
           <Chip text={`${people.length} ${people.length === 1 ? 'person' : 'people'}`} tone="accent" />
         </View>
         <ThemedText type="small" themeColor="textSecondary">
-          {isAdmin ? 'Click a person to see their card, change their status or remove them.' : 'Click a person to see their card.'}
+          {isProjectAdmin
+            ? 'Click a person to see their card, change their status or their groups.'
+            : isAdmin
+              ? 'Click a person to see their card or change their teams.'
+              : 'Click a person to see their card.'}
         </ThemedText>
 
-        {subgroup && canManage(subgroup) && (
+        {subgroup && isAdmin && (
           <Button title="Add people" icon="plus" variant="secondary" small onPress={() => setAdding(!adding)} />
         )}
         {adding && subgroup && (
           <View style={[styles.addBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
             {notHere.length === 0 && (
               <ThemedText type="small" themeColor="textSecondary">
-                Everyone in the project is already here. Invite new people on the project&apos;s People page.
+                Everyone in the project is already here. Admins invite new people on the project&apos;s People page.
               </ThemedText>
             )}
             {notHere.map((person) => (
@@ -166,7 +183,7 @@ export function People({ info }: { info: SpaceInfo }) {
                   title="Add"
                   small
                   variant="secondary"
-                  onPress={() => run(supabase.from('subgroup_members').insert({ subgroup_id: subgroup.id, user_id: person.user_id }))}
+                  onPress={() => run(() => supabase.from('subgroup_members').insert({ subgroup_id: subgroup.id, user_id: person.user_id }))}
                 />
               </View>
             ))}
@@ -180,8 +197,8 @@ export function People({ info }: { info: SpaceInfo }) {
         )}
         <View>
           {people.map((person, index) => {
-            const where = placesOf(person.user_id).map((p) => nameOf(p.subgroup_id));
-            const showWhere = scope.length > 1 && where.length > 0;
+            const status = statusOf(person.user_id);
+            const where = inScope(person.user_id).map((p) => nameOf(p.subgroup_id));
             return (
               <Pressable
                 key={person.user_id}
@@ -200,12 +217,12 @@ export function People({ info }: { info: SpaceInfo }) {
                     {person.user_id === me && <ThemedText themeColor="textSecondary"> (you)</ThemedText>}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                    {showWhere
+                    {scope.length > 1 && where.length > 0
                       ? where.join(', ')
                       : [person.profile?.position, person.profile?.company_name].filter(Boolean).join(' · ')}
                   </ThemedText>
                 </View>
-                <Chip text={statusOf(person.user_id)} tone={statusOf(person.user_id) === 'Staff' ? 'plain' : 'lavender'} />
+                <Chip text={STATUS_LABEL[status]} tone={status === 'member' ? 'plain' : status === 'admin' ? 'accent' : 'lavender'} />
                 <Icon name="chevron-right" size={18} color="textSecondary" />
               </Pressable>
             );
@@ -226,7 +243,7 @@ export function People({ info }: { info: SpaceInfo }) {
               info={info}
               invitations={data.invitations}
               onChanged={refresh}
-              onRemove={(id) => run(supabase.from('invitations').delete().eq('id', id))}
+              onRemove={(id) => run(() => supabase.from('invitations').delete().eq('id', id))}
             />
           )}
         </>
@@ -237,99 +254,91 @@ export function People({ info }: { info: SpaceInfo }) {
           person={open}
           isMe={open.user_id === me}
           onClose={() => setOpenId(null)}
-          projectStatus={
-            subgroup
-              ? null
-              : {
-                  role: projectRole.get(open.user_id) === 'admin' ? 'admin' : 'member',
-                  canChange: isProjectAdmin && open.user_id !== me,
-                  onChange: (role) =>
-                    run(supabase.from('project_members').update({ role }).eq('project_id', project.id).eq('user_id', open.user_id)),
-                  onRemove: () => {
-                    setOpenId(null);
-                    return run(supabase.from('project_members').delete().eq('project_id', project.id).eq('user_id', open.user_id));
-                  },
+          status={statusOf(open.user_id)}
+          manages={managedBy(open.user_id).map((g) => g.name)}
+          canChangeStatus={isProjectAdmin && open.user_id !== me}
+          groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+          onStatus={(status, groupId) => {
+            const id = open.user_id;
+            if (status === 'admin') return run(setProjectRole(id, 'admin'), ...noLongerManager(id));
+            if (status === 'manager' && groupId)
+              return run(setProjectRole(id, 'member'), ...noLongerManager(id, groupId), setPlaceRole(id, groupId, 'manager'));
+            return run(setProjectRole(id, 'member'), ...noLongerManager(id));
+          }}
+          onRemoveFromProject={
+            isProjectAdmin && open.user_id !== me && !subgroup
+              ? () => {
+                  setOpenId(null);
+                  return run(() => supabase.from('project_members').delete().eq('project_id', project.id).eq('user_id', open.user_id));
                 }
+              : null
           }
-          places={placesOf(open.user_id).map((placed) => {
-            const item = scope.find((s) => s.id === placed.subgroup_id) as SubgroupNode;
-            const role = (placed.role ?? 'member') as Role;
-            const manage = canManage(item) && (full || role !== 'admin');
-            return {
-              id: item.id,
-              name: item.name,
-              role,
-              word: item.parent_id ? 'team' : 'group',
-              roles: manage && open.user_id !== me ? (full ? PLACE_ROLES : PLACE_ROLES.slice(1)) : null,
-              canRemove: manage || open.user_id === me,
-              onChange: (next: Role) =>
-                run(supabase.from('subgroup_members').update({ role: next }).eq('subgroup_id', item.id).eq('user_id', open.user_id)),
-              onRemove: () =>
-                run(supabase.from('subgroup_members').delete().eq('subgroup_id', item.id).eq('user_id', open.user_id)),
-            };
-          })}
-          canAddTo={scope
-            .filter((item) => canManage(item) && !placesOf(open.user_id).some((p) => p.subgroup_id === item.id))
+          places={placedOf(open.user_id)
+            .filter((p) => all.some((s) => s.id === p.subgroup_id))
+            .map((placed) => {
+              const item = all.find((s) => s.id === placed.subgroup_id) as SubgroupNode;
+              const mine = scope.some((s) => s.id === item.id);
+              return {
+                id: item.id,
+                name: item.parent_id ? `${nameOf(item.parent_id)} · ${item.name}` : item.name,
+                manager: leads(placed.role),
+                word: item.parent_id ? 'team' : 'group',
+                // Managers take staff out of their own group and teams; anyone can leave.
+                canRemove: open.user_id === me || isProjectAdmin || (isAdmin && mine && !leads(placed.role)),
+                onRemove: () =>
+                  run(() => supabase.from('subgroup_members').delete().eq('subgroup_id', item.id).eq('user_id', open.user_id)),
+              };
+            })}
+          canAddTo={(isAdmin ? scope : [])
+            .filter((item) => !placedOf(open.user_id).some((p) => p.subgroup_id === item.id))
             .map((item) => ({
               id: item.id,
-              name: item.name,
-              onAdd: () => run(supabase.from('subgroup_members').insert({ subgroup_id: item.id, user_id: open.user_id })),
+              name: item.parent_id ? `${nameOf(item.parent_id)} · ${item.name}` : item.name,
+              onAdd: () => run(() => supabase.from('subgroup_members').insert({ subgroup_id: item.id, user_id: open.user_id })),
             }))}
-          emptyNote={subgroup ? `Not in this ${word}.` : 'Not in any group yet.'}
         />
       )}
     </>
   );
 }
 
-type CardPlace = {
-  id: string;
-  name: string;
-  role: Role;
-  word: string;
-  /** The statuses that can be picked; null when it cannot be changed. */
-  roles: readonly { value: Role; label: string }[] | null;
-  canRemove: boolean;
-  onChange: (role: Role) => void;
-  onRemove: () => void;
-};
-
 type ProfileCardProps = {
   person: Person;
   isMe: boolean;
   onClose: () => void;
-  projectStatus: {
-    role: 'admin' | 'member';
-    canChange: boolean;
-    onChange: (role: 'admin' | 'member') => void;
-    onRemove: () => void;
-  } | null;
-  places: CardPlace[];
+  status: Status;
+  /** Names of the groups this person manages. */
+  manages: string[];
+  canChangeStatus: boolean;
+  groups: { id: string; name: string }[];
+  onStatus: (status: Status, groupId?: string) => void;
+  onRemoveFromProject: (() => void) | null;
+  places: { id: string; name: string; manager: boolean; word: string; canRemove: boolean; onRemove: () => void }[];
   canAddTo: { id: string; name: string; onAdd: () => void }[];
-  emptyNote: string;
 };
 
-/** The small card of one person: name, role (their job) and status. Pressing a status shows the other options. */
-function ProfileCard({ person, isMe, onClose, projectStatus, places, canAddTo, emptyNote }: ProfileCardProps) {
+/** The small card of one person: name, role (their job) and status. Pressing the status shows the other options. */
+function ProfileCard(props: ProfileCardProps) {
+  const { person, isMe, onClose, status, manages, canChangeStatus, groups, onStatus, onRemoveFromProject, places, canAddTo } = props;
   const theme = useTheme();
-  // Which status is showing its options: 'project' or the id of a group or team.
-  const [changing, setChanging] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
+  const [pickGroup, setPickGroup] = useState(false);
   const [adding, setAdding] = useState(false);
   const job = [person.profile?.position, person.profile?.company_name].filter(Boolean).join(' at ');
+  const statusText = status === 'manager' ? `Manager of ${manages.join(', ')}` : STATUS_LABEL[status];
 
-  const statusChip = (key: string, text: string, canOpen: boolean) =>
-    canOpen ? (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Change status ${text}`}
-        onPress={() => setChanging(changing === key ? null : key)}
-        style={({ pressed }) => [styles.statusButton, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.6 : 1 }]}>
-        <ThemedText type="smallBold">{text}</ThemedText>
-        <Icon name={changing === key ? 'chevron-up' : 'chevron-down'} size={16} />
-      </Pressable>
-    ) : (
-      <Chip text={text} tone={text === 'Staff' ? 'plain' : 'lavender'} />
-    );
+  const choose = (next: Status) => {
+    if (next === 'manager') {
+      if (groups.length === 1) {
+        setChanging(false);
+        onStatus('manager', groups[0].id);
+      } else setPickGroup(true);
+      return;
+    }
+    setChanging(false);
+    setPickGroup(false);
+    if (next !== status) onStatus(next);
+  };
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -354,78 +363,91 @@ function ProfileCard({ person, isMe, onClose, projectStatus, places, canAddTo, e
 
           <View style={styles.cardLine}>
             <ThemedText type="label">Status</ThemedText>
-            {projectStatus && (
-              <View style={styles.statusBlock}>
-                <View style={styles.between}>
-                  <ThemedText type="bold" style={styles.grow}>
-                    Whole project
-                  </ThemedText>
-                  {statusChip('project', projectStatus.role === 'admin' ? 'Admin' : 'Staff', projectStatus.canChange)}
-                </View>
-                {changing === 'project' && (
-                  <View style={[styles.options, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                    <Choices
-                      options={PROJECT_ROLES}
-                      value={projectStatus.role}
-                      onChange={(role) => {
-                        setChanging(null);
-                        projectStatus.onChange(role);
-                      }}
-                    />
-                    <TextButton title="Remove from the project" danger onPress={projectStatus.onRemove} />
-                  </View>
-                )}
+            {canChangeStatus ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Change status"
+                onPress={() => {
+                  setChanging(!changing);
+                  setPickGroup(false);
+                }}
+                style={({ pressed }) => [styles.statusButton, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.6 : 1 }]}>
+                <ThemedText type="smallBold" style={styles.shrink}>
+                  {statusText}
+                </ThemedText>
+                <Icon name={changing ? 'chevron-up' : 'chevron-down'} size={16} />
+              </Pressable>
+            ) : (
+              <View style={styles.start}>
+                <Chip text={statusText} tone={status === 'member' ? 'plain' : status === 'admin' ? 'accent' : 'lavender'} />
               </View>
             )}
-            {places.length === 0 && !projectStatus && <ThemedText themeColor="textSecondary">{emptyNote}</ThemedText>}
+            {!changing && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {STATUS_HINT[status]}
+              </ThemedText>
+            )}
+            {changing && (
+              <View style={[styles.options, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <Choices
+                  options={groups.length ? STATUSES : STATUSES.filter((s) => s.value !== 'manager')}
+                  value={pickGroup ? 'manager' : status}
+                  onChange={choose}
+                />
+                {pickGroup && (
+                  <>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Manager of which group?
+                    </ThemedText>
+                    <View style={styles.addChips}>
+                      {groups.map((group) => (
+                        <Button
+                          key={group.id}
+                          title={group.name}
+                          small
+                          variant="secondary"
+                          onPress={() => {
+                            setChanging(false);
+                            setPickGroup(false);
+                            onStatus('manager', group.id);
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </>
+                )}
+                {onRemoveFromProject && <TextButton title="Remove from the project" danger onPress={onRemoveFromProject} />}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.cardLine}>
+            <ThemedText type="label">Groups and teams</ThemedText>
+            {places.length === 0 && <ThemedText themeColor="textSecondary">Not in any group yet.</ThemedText>}
             {places.map((place) => (
-              <View key={place.id} style={styles.statusBlock}>
-                <View style={styles.between}>
-                  <ThemedText type="bold" style={styles.grow} numberOfLines={2}>
-                    {place.name}
-                  </ThemedText>
-                  {statusChip(place.id, ROLE_LABEL[place.role], !!place.roles || place.canRemove)}
-                </View>
-                {changing === place.id && (
-                  <View style={[styles.options, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                    {place.roles && (
-                      <Choices
-                        options={place.roles}
-                        value={place.role}
-                        onChange={(role) => {
-                          setChanging(null);
-                          place.onChange(role);
-                        }}
-                      />
-                    )}
-                    {place.canRemove && (
-                      <TextButton
-                        title={isMe ? `Leave this ${place.word}` : `Remove from this ${place.word}`}
-                        danger
-                        onPress={() => {
-                          setChanging(null);
-                          place.onRemove();
-                        }}
-                      />
-                    )}
-                  </View>
+              <View key={place.id} style={styles.between}>
+                <ThemedText style={styles.grow} numberOfLines={2}>
+                  {place.name}
+                  {place.manager && <ThemedText themeColor="textSecondary"> · manager</ThemedText>}
+                </ThemedText>
+                {place.canRemove && (
+                  <TextButton title={isMe ? 'Leave' : 'Remove'} danger onPress={place.onRemove} />
                 )}
               </View>
             ))}
+            {canAddTo.length > 0 && (
+              <>
+                <TextButton title={adding ? 'Hide' : 'Add to a group or team'} onPress={() => setAdding(!adding)} />
+                {adding && (
+                  <View style={styles.addChips}>
+                    {canAddTo.map((item) => (
+                      <Button key={item.id} title={item.name} icon="plus" small variant="secondary" onPress={item.onAdd} />
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
           </View>
-
-          {canAddTo.length > 0 && (
-            <View style={styles.cardLine}>
-              <TextButton title={adding ? 'Hide groups' : 'Add to a group or team'} onPress={() => setAdding(!adding)} />
-              {adding && (
-                <View style={styles.addChips}>
-                  {canAddTo.map((item) => (
-                    <Button key={item.id} title={item.name} icon="plus" small variant="secondary" onPress={item.onAdd} />
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
         </View>
       </View>
     </Modal>
@@ -434,6 +456,8 @@ function ProfileCard({ person, isMe, onClose, projectStatus, places, canAddTo, e
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
+  shrink: { flexShrink: 1 },
+  start: { alignItems: 'flex-start' },
   center: { textAlign: 'center' },
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
@@ -450,9 +474,16 @@ const styles = StyleSheet.create({
   closeCorner: { position: 'absolute', top: 10, right: 10, zIndex: 1 },
   cardTop: { alignItems: 'center', gap: 10 },
   cardLine: { gap: 8 },
-  statusBlock: { gap: 8 },
-  statusButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999 },
-  options: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 6 },
+  statusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+  },
+  options: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 8 },
   addChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
 

@@ -152,7 +152,7 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
   // 'new', a milestone's id, or nothing open.
   const [editing, setEditing] = useState<string | null>(null);
   // A manager changes the schedule of their own group or team only.
-  const canEdit = info.isFullAdmin || (info.isAdmin && place?.id === info.subgroup?.id);
+  const canEdit = info.isAdmin;
   const edit = canEdit ? setEditing : undefined;
 
   return (

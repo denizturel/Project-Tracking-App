@@ -72,7 +72,7 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
     error: null,
     tree: {
       companies,
-      adminSubgroups: (ownGroups.data ?? []).filter((row) => row.role === 'admin').map((row) => row.subgroup_id as string),
+      adminSubgroups: (ownGroups.data ?? []).filter((row) => row.role === 'admin' || row.role === 'manager').map((row) => row.subgroup_id as string),
       managerSubgroups: (ownGroups.data ?? [])
         .filter((row) => row.role === 'manager')
         .map((row) => row.subgroup_id as string),
