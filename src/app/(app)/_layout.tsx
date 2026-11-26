@@ -1,9 +1,9 @@
-import { Stack, useGlobalSearchParams, usePathname } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MiniRail, Sidebar } from '@/components/sidebar';
+import { MenuClose, MiniRail, Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -17,15 +17,11 @@ export default function AppLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
-  const pathname = usePathname();
-  const { tab } = useGlobalSearchParams<{ tab?: string }>();
-  const page = `${pathname}?${typeof tab === 'string' ? tab : ''}`;
-
   // Wide screens: the menu stays open until it is closed with its button.
   const [pinned, setPinned] = useState(true);
-  // Phones: the menu slides over the page, and closes by itself when another page opens.
-  const [openOn, setOpenOn] = useState<string | null>(null);
-  const drawerOpen = !wide && openOn === page;
+  // Phones: the menu lies over the page, and closes when a page is picked from it.
+  const [open, setOpen] = useState(false);
+  const drawerOpen = !wide && open;
 
   const menuHeader = (onClose: () => void) => (
     <View style={[styles.menuHeader, { backgroundColor: theme.rail, borderBottomColor: theme.border }]}>
@@ -61,7 +57,7 @@ export default function AppLayout() {
                     styles.topBar,
                     { paddingTop: insets.top + 6, backgroundColor: theme.card, borderBottomColor: theme.border },
                   ]}>
-                  <IconButton icon="menu" label="Open menu" onPress={() => setOpenOn(page)} />
+                  <IconButton icon="menu" label="Open menu" onPress={() => setOpen(true)} />
                   {back && <IconButton icon="chevron-left" label="Back" onPress={navigation.goBack} />}
                   <ThemedText type="heading" numberOfLines={1} style={styles.topBarTitle}>
                     {options.title}
@@ -80,23 +76,22 @@ export default function AppLayout() {
         </View>
       </View>
 
-      <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={() => setOpenOn(null)}>
-        <View style={styles.drawerRow}>
+      {/* A plain layer over the page, not a system pop-up: those can leave the iPhone screen frozen. */}
+      {drawerOpen && (
+        <View style={[StyleSheet.absoluteFill, styles.drawerRow]}>
           <View
             style={[
               styles.drawer,
               { backgroundColor: theme.rail, paddingTop: insets.top, paddingBottom: insets.bottom },
             ]}>
-            {menuHeader(() => setOpenOn(null))}
-            <Sidebar />
+            {menuHeader(() => setOpen(false))}
+            <MenuClose value={() => setOpen(false)}>
+              <Sidebar />
+            </MenuClose>
           </View>
-          <Pressable
-            accessibilityLabel="Close menu"
-            style={styles.backdrop}
-            onPress={() => setOpenOn(null)}
-          />
+          <Pressable accessibilityLabel="Close menu" style={styles.backdrop} onPress={() => setOpen(false)} />
         </View>
-      </Modal>
+      )}
     </WorkspaceProvider>
   );
 }
@@ -120,7 +115,7 @@ const styles = StyleSheet.create({
   },
   topBarTitle: { flex: 1, textAlign: 'center' },
   closedRail: { width: 64, borderRightWidth: 1 },
-  drawerRow: { flex: 1, flexDirection: 'row' },
+  drawerRow: { flexDirection: 'row', zIndex: 10 },
   drawer: { width: '84%', maxWidth: 340 },
   backdrop: { flex: 1, backgroundColor: 'rgba(60, 40, 30, 0.35)' },
 });

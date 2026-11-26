@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, ErrorText, Field, Icon, type IconName } from '@/components/ui';
@@ -7,17 +7,19 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
+import { WIDE_SCREEN } from '@/lib/workspace';
 import { supabase } from '@/lib/supabase';
 
 /** Settings: security and password (change password, phone unlock, delete account) and sign out. */
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const [security, setSecurity] = useState(false);
+  const wide = useWindowDimensions().width >= WIDE_SCREEN;
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={styles.column}>
-        <ThemedText type="title">Settings</ThemedText>
+        {wide && <ThemedText type="title">Settings</ThemedText>}
 
         <Card style={styles.list}>
           <MenuRow

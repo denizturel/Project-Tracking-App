@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, ErrorText, Field } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
+import { WIDE_SCREEN } from '@/lib/workspace';
 import { supabase } from '@/lib/supabase';
 
 /** Your own details, as teammates see them next to your name. */
 export default function ProfileScreen() {
   const { session, profile, refreshProfile } = useAuth();
+  const wide = useWindowDimensions().width >= WIDE_SCREEN;
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [company, setCompany] = useState(profile?.company_name ?? '');
   const [position, setPosition] = useState(profile?.position ?? '');
@@ -53,7 +55,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={styles.column}>
-        <ThemedText type="title">Profile</ThemedText>
+        {wide && <ThemedText type="title">Profile</ThemedText>}
         <Card style={styles.top}>
           <Avatar name={fullName || profile?.full_name} size={72} />
           <View style={styles.grow}>

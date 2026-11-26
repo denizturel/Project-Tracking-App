@@ -1,5 +1,5 @@
 import { Link, useGlobalSearchParams, usePathname } from 'expo-router';
-import { useState } from 'react';
+import { createContext, use, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -24,6 +24,9 @@ const ICONS: Record<string, IconName> = {
 // The list of groups and teams is the menu itself, so those two tabs are left out here.
 const sections = (tabs: string[]) => tabs.filter((tab) => tab !== 'Groups' && tab !== 'Teams');
 const CHAT_PARTS = ['Chat', 'Media, links, docs', 'People', 'Schedule'];
+
+/** Set by the phone menu, so that picking a page closes it. */
+export const MenuClose = createContext<(() => void) | null>(null);
 
 /** Folding tree: each company > its projects > their sections and groups > teams, then "You". */
 export function Sidebar() {
@@ -60,7 +63,7 @@ export function Sidebar() {
 
   return (
     <ScrollView style={{ backgroundColor: theme.rail }} contentContainerStyle={styles.content}>
-      <Row href="/" label="All projects" icon="grid" depth={0} active={pathname === '/'} />
+      <Row href="/" label="All projects" icon="grid" depth={0} active={pathname === '/'} home />
 
       <View style={styles.sectionHeader}>
         <ThemedText type="label">Projects</ThemedText>
@@ -269,7 +272,7 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
       <Pressable accessibilityRole="button" accessibilityLabel="Open menu" onPress={onOpen} style={styles.miniBox}>
         <Icon name="menu" size={22} />
       </Pressable>
-      <Link href="/" asChild>
+      <Link href="/" asChild dismissTo>
         <Pressable accessibilityRole="link" accessibilityLabel="All projects">
           <View style={box(pathname === '/')}>
             <Icon name="grid" size={22} color={pathname === '/' ? 'primary' : 'textSecondary'} />
@@ -346,14 +349,17 @@ type RowProps = {
   /** undefined: nothing to fold. */
   folded?: boolean;
   onToggle?: () => void;
+  /** Goes back to the first page instead of opening it again on top. */
+  home?: boolean;
 };
 
-function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle }: RowProps) {
+function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home }: RowProps) {
   const theme = useTheme();
+  const closeMenu = use(MenuClose);
 
   return (
     <View style={[styles.row, { marginLeft: depth * 18 }]}>
-      <Link href={href} asChild>
+      <Link href={href} asChild dismissTo={home} onPress={() => closeMenu?.()}>
         <Pressable accessibilityRole="link" accessibilityState={{ selected: active }} style={styles.grow}>
           {/* The row styling sits on an inner box: a link's own style is not kept on the website. */}
           <View style={[styles.link, active && [styles.active, { backgroundColor: theme.card }]]}>
