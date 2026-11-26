@@ -281,7 +281,8 @@ export function People({ info }: { info: SpaceInfo }) {
               return {
                 id: item.id,
                 name: item.parent_id ? `${nameOf(item.parent_id)} · ${item.name}` : item.name,
-                manager: leads(placed.role),
+                // Shown only where it is the person's status: a manager of a group.
+                manager: leads(placed.role) && !item.parent_id && projectRole.get(open.user_id) !== 'admin',
                 word: item.parent_id ? 'team' : 'group',
                 // Managers take staff out of their own group and teams; anyone can leave.
                 canRemove: open.user_id === me || isProjectAdmin || (isAdmin && mine && !leads(placed.role)),
@@ -324,6 +325,8 @@ function ProfileCard(props: ProfileCardProps) {
   const [changing, setChanging] = useState(false);
   const [pickGroup, setPickGroup] = useState(false);
   const [adding, setAdding] = useState(false);
+  // Leaving or removing takes two presses, so a slip does nothing.
+  const [confirming, setConfirming] = useState<string | null>(null);
   const job = [person.profile?.position, person.profile?.company_name].filter(Boolean).join(' at ');
   const statusText = status === 'manager' ? `Manager of ${manages.join(', ')}` : STATUS_LABEL[status];
 
@@ -428,10 +431,18 @@ function ProfileCard(props: ProfileCardProps) {
               <View key={place.id} style={styles.between}>
                 <ThemedText style={styles.grow} numberOfLines={2}>
                   {place.name}
-                  {place.manager && <ThemedText themeColor="textSecondary"> · manager</ThemedText>}
+                  {place.manager && <ThemedText themeColor="textSecondary"> · Manager</ThemedText>}
                 </ThemedText>
                 {place.canRemove && (
-                  <TextButton title={isMe ? 'Leave' : 'Remove'} danger onPress={place.onRemove} />
+                  <TextButton
+                    title={confirming === place.id ? (isMe ? 'Yes, leave' : 'Yes, remove') : isMe ? 'Leave' : 'Remove'}
+                    danger
+                    onPress={() => {
+                      if (confirming !== place.id) return setConfirming(place.id);
+                      setConfirming(null);
+                      place.onRemove();
+                    }}
+                  />
                 )}
               </View>
             ))}
