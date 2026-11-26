@@ -136,10 +136,9 @@ function CompanyPage({ company }: { company: CompanyNode }) {
               <View style={styles.grow}>
                 <ThemedText type="bold" raw numberOfLines={1}>
                   {person.profile?.full_name ?? ''}
-                  {person.profile?.username ? `  @${person.profile.username}` : ''}
                 </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1}>
-                  {person.profile?.position ?? ''}
+                <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={2}>
+                  {[person.profile?.username ? `@${person.profile.username}` : null, person.profile?.position].filter(Boolean).join(' · ')}
                 </ThemedText>
               </View>
               <Chip text={ROLE_WORDS[person.role]} tone={person.role === 'owner' || person.role === 'admin' ? 'lavender' : 'plain'} />
