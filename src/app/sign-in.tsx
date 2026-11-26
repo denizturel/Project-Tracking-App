@@ -11,6 +11,10 @@ export default function SignInScreen() {
   const { signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [fullName, setFullName] = useState('');
+  const [company, setCompany] = useState('');
+  const [position, setPosition] = useState('');
+  const [department, setDepartment] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<'email' | 'google' | null>(null);
@@ -18,8 +22,9 @@ export default function SignInScreen() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const creating = mode === 'sign-up';
-  const canSubmit =
-    email.trim().length > 3 && password.length >= 6 && (!creating || fullName.trim().length > 1);
+  // Company and position are required to create an account (decided by Deniz).
+  const detailsFilled = fullName.trim().length > 1 && !!company.trim() && !!position.trim();
+  const canSubmit = email.trim().length > 3 && password.length >= 6 && (!creating || detailsFilled);
 
   async function submit() {
     setBusy('email');
@@ -29,7 +34,15 @@ export default function SignInScreen() {
     if (creating) {
       const { data, error: failed } = await supabase.auth.signUp({
         ...credentials,
-        options: { data: { full_name: fullName.trim() } },
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            company_name: company.trim(),
+            position: position.trim(),
+            department: department.trim(),
+            phone: phone.trim(),
+          },
+        },
       });
       if (failed) setError(failed.message);
       else if (!data.session) {
@@ -84,6 +97,37 @@ export default function SignInScreen() {
             textContentType="name"
           />
         )}
+        {creating && (
+          <Field
+            label="Company"
+            required
+            value={company}
+            onChangeText={setCompany}
+            autoComplete="organization"
+            textContentType="organizationName"
+          />
+        )}
+        {creating && (
+          <Field
+            label="Position"
+            required
+            value={position}
+            onChangeText={setPosition}
+            autoComplete="organization-title"
+            textContentType="jobTitle"
+          />
+        )}
+        {creating && <Field label="Department" value={department} onChangeText={setDepartment} />}
+        {creating && (
+          <Field
+            label="Phone"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+          />
+        )}
         <Field
           label="Email"
           required
@@ -104,6 +148,13 @@ export default function SignInScreen() {
           textContentType={creating ? 'newPassword' : 'password'}
           onSubmitEditing={() => canSubmit && submit()}
         />
+
+        {creating && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Fields with * are required. With Google, you fill in company and position on the next
+            screen.
+          </ThemedText>
+        )}
 
         <ErrorText>{error}</ErrorText>
         {notice && <ThemedText type="small">{notice}</ThemedText>}
