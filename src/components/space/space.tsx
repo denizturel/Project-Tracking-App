@@ -274,7 +274,7 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
   );
 }
 
-const WIDE_TABS = ['Overview', 'Groups', 'Teams', 'Schedule', 'Tasks', 'Questions & solutions'];
+const WIDE_TABS = ['Overview', 'Groups', 'Teams', 'Schedule', 'Tasks', 'Questions & solutions', 'People'];
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function Crumb(props: { label: string; href?: React.ComponentProps<typeof Link>['href']; last?: boolean }) {
