@@ -74,7 +74,7 @@ const time = (iso: string) =>
   new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Live chat of a project, group or team, or a private chat between two people (`direct`). */
-export function Chat({ info, direct }: { info?: SpaceInfo; direct?: string }) {
+export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: string; closed?: string }) {
   const theme = useTheme();
   const { session } = useAuth();
   const userId = session?.user.id;
@@ -128,7 +128,8 @@ export function Chat({ info, direct }: { info?: SpaceInfo; direct?: string }) {
       : await supabase.from('messages').insert({ conversation_id: conversationId, body });
     setBusy(false);
     if (failed) {
-      setError(failed.message);
+      // A private chat stops taking messages when one side blocked the other or they no longer share anything.
+      setError(direct && failed.message.includes('row-level security') ? 'This message could not be sent.' : failed.message);
       return;
     }
     setText('');
@@ -214,6 +215,11 @@ export function Chat({ info, direct }: { info?: SpaceInfo; direct?: string }) {
       <View style={[styles.composer, { borderTopColor: theme.border, backgroundColor: theme.card }]}>
         <View style={styles.composerColumn}>
           <ErrorText>{error ?? data.error}</ErrorText>
+          {!!closed && (
+            <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+              {closed}
+            </ThemedText>
+          )}
           {editing && (
             <View style={styles.actions}>
               <ThemedText type="small" themeColor="textSecondary">
@@ -228,6 +234,7 @@ export function Chat({ info, direct }: { info?: SpaceInfo; direct?: string }) {
               />
             </View>
           )}
+          {!closed && (
           <View style={styles.inputRow}>
             <TextInput
               accessibilityLabel="Message"
@@ -248,6 +255,7 @@ export function Chat({ info, direct }: { info?: SpaceInfo; direct?: string }) {
               disabled={!text.trim()}
             />
           </View>
+          )}
         </View>
       </View>
     </KeyboardAvoidingView>

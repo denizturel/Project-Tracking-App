@@ -6,10 +6,11 @@ import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, ErrorText, Field, TextButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { acceptConnection, askToConnect, type MyPerson, removeConnection, startChat, useMyPeople } from '@/lib/direct';
+import { acceptConnection, askToConnect, type MyPerson, removeConnection, startChat, unblockPerson, useMyPeople } from '@/lib/direct';
 import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { useRows } from '@/lib/use-rows';
 import { WIDE_SCREEN } from '@/lib/workspace';
 
 type Found = Pick<MyPerson, 'user_id' | 'full_name' | 'position' | 'company_name'> & { username?: string | null };
@@ -24,7 +25,13 @@ export default function ConnectionsScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   // Removing takes two presses, so a slip does nothing.
   const [confirming, setConfirming] = useState<string | null>(null);
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
+  const blocks = useRows<{ blocked: string; profile: { full_name: string } | null }>('blocks', () =>
+    supabase
+      .from('user_blocks')
+      .select('blocked, profile:profiles!blocked(full_name)')
+      .returns<{ blocked: string; profile: { full_name: string } | null }[]>(),
+  );
   const [username, setUsername] = useState('');
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<Found | 'nobody' | null>(null);
@@ -32,13 +39,14 @@ export default function ConnectionsScreen() {
   const received = people.filter((p) => p.connection === 'received');
   const connected = people.filter((p) => p.connection === 'connected');
   const sent = people.filter((p) => p.connection === 'sent');
-  const suggested = people.filter((p) => !p.connection);
+  const suggested = people.filter((p) => !p.connection && !blocks.rows.some((b) => b.blocked === p.user_id));
 
   async function run(action: Result) {
     const result = await action;
     setFailed(result.error?.message ?? null);
     setConfirming(null);
     reload();
+    blocks.reload();
   }
 
   async function message(userId: string) {
@@ -178,6 +186,18 @@ export default function ConnectionsScreen() {
               ),
             )}
         </Card>
+
+        {blocks.rows.length > 0 && (
+          <Card>
+            <ThemedText type="label">Blocked people</ThemedText>
+            {blocks.rows.map((block) =>
+              line(
+                { user_id: block.blocked, full_name: block.profile?.full_name ?? '', position: null, company_name: null },
+                <TextButton title="Unblock" onPress={() => run(unblockPerson(block.blocked, session?.user.id ?? ''))} />,
+              ),
+            )}
+          </Card>
+        )}
 
         {suggested.length > 0 && (
           <Card>

@@ -101,6 +101,12 @@ export async function startChat(userId: string): Promise<{ id: string | null; er
   return { id: (result.data as string | null) ?? null, error: result.error?.message ?? null };
 }
 
+export const blockPerson = (userId: string) => supabase.from('user_blocks').insert({ blocked: userId });
+export const unblockPerson = (userId: string, me: string) =>
+  supabase.from('user_blocks').delete().eq('blocker', me).eq('blocked', userId);
+export const reportPerson = (userId: string, reason: string, conversationId?: string) =>
+  supabase.from('user_reports').insert({ reported: userId, reason: reason.trim(), conversation_id: conversationId ?? null });
+
 export const askToConnect = (userId: string) => supabase.from('connections').insert({ addressee: userId });
 export const acceptConnection = (id: string) => supabase.from('connections').update({ status: 'accepted' }).eq('id', id);
 /** Declines a request, takes back my own request, or ends a connection. */
