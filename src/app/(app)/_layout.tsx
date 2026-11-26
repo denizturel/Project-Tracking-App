@@ -27,7 +27,7 @@ export default function AppLayout() {
               headerTitleStyle: { fontSize: 19, fontFamily: 'Sora_600SemiBold' },
               contentStyle: { backgroundColor: theme.background },
             }}>
-            <Stack.Screen name="index" options={{ title: 'Workroom' }} />
+            <Stack.Screen name="index" options={{ title: 'Projects' }} />
             <Stack.Screen name="project/[id]" options={{ title: 'Project' }} />
             <Stack.Screen name="group/[id]" options={{ title: 'Group' }} />
           </Stack>

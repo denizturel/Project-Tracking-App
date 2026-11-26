@@ -50,7 +50,7 @@ export function Sidebar() {
 
   return (
     <ScrollView style={{ backgroundColor: theme.rail }} contentContainerStyle={styles.content}>
-      <Row href="/" label="Home" icon="home" depth={0} active={pathname === '/'} />
+      <Row href="/" label="All projects" icon="grid" depth={0} active={pathname === '/'} />
 
       <View style={styles.sectionHeader}>
         <ThemedText type="label">Projects</ThemedText>
@@ -61,7 +61,7 @@ export function Sidebar() {
 
       {!loading && companies.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
-          No projects yet. Create one from Home.
+          No projects yet. Create one from All projects.
         </ThemedText>
       )}
 
@@ -93,7 +93,7 @@ export function Sidebar() {
 
             {!closed && mine.length === 0 && (
               <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
-                No projects here yet. Create one from Home.
+                No projects here yet. Create one from All projects.
               </ThemedText>
             )}
             {(closed ? [] : mine).map((project) => {

@@ -170,7 +170,7 @@ export function Overview({ info }: { info: SpaceInfo }) {
           />
           {!simple && (
             <Tile
-              label={next ? 'Next on the schedule' : 'Schedule'}
+              label={next ? 'Next milestone' : 'Schedule'}
               value={nextIn === null ? '–' : nextIn < 0 ? 'Late' : nextIn === 0 ? 'Today' : `${nextIn} day${nextIn === 1 ? '' : 's'}`}
               hint={next ? `${shortDate(next.due_date as string)}, ${next.title}` : 'Nothing planned yet'}
               tint="mint"

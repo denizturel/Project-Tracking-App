@@ -110,7 +110,8 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
             {name}
           </ThemedText>
         )}
-        <TabBar tabs={tabs} value={shownTab} onChange={setTab} />
+        {/* On wide screens the side menu already lists the project's sections. */}
+        {!(wide && level === 'project') && <TabBar tabs={tabs} value={shownTab} onChange={setTab} />}
         {shownTab === 'Chat' && simple && (
           <TabBar tabs={TEAM_CHAT_TABS} value={chatTab} onChange={setChatTab} small />
         )}
