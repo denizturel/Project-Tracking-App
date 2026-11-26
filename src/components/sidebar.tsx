@@ -8,7 +8,6 @@ import { GROUP_TABS, PROJECT_TABS, TEAM_TABS } from '@/components/space/space';
 import { Avatar, Icon, type IconName, TextButton } from '@/components/ui';
 import { Spacing, type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -30,8 +29,6 @@ const CHAT_PARTS = ['Chat', 'Media, links, docs', 'People', 'Schedule'];
 export function Sidebar() {
   const theme = useTheme();
   const { profile, signOut } = useAuth();
-  const lock = useAppLock();
-  const [lockError, setLockError] = useState<string | null>(null);
   const { companies, projects, subgroups, adminSubgroups, loading } = useWorkspace();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
@@ -247,17 +244,8 @@ export function Sidebar() {
             </ThemedText>
           </View>
         </View>
-        {lock.available && (
-          <TextButton
-            title={lock.enabled ? `Turn off ${lock.method} unlock` : `Unlock with ${lock.method}`}
-            onPress={async () => setLockError(await lock.setEnabled(!lock.enabled))}
-          />
-        )}
-        {lockError && (
-          <ThemedText type="small" themeColor="danger">
-            {lockError}
-          </ThemedText>
-        )}
+        <Row href="/profile" label="Profile" icon="user" depth={0} active={pathname === '/profile'} />
+        <Row href="/settings" label="Settings" icon="settings" depth={0} active={pathname === '/settings'} />
         <TextButton title="Sign out" onPress={signOut} />
       </View>
     </ScrollView>
@@ -329,9 +317,18 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
       ))}
 
       <View style={[styles.miniGroup, { borderTopColor: theme.border }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open menu at your profile" onPress={onOpen}>
-          <Avatar name={profile?.full_name} />
-        </Pressable>
+        <Link href="/profile" asChild>
+          <Pressable accessibilityRole="link" accessibilityLabel="Profile">
+            <Avatar name={profile?.full_name} />
+          </Pressable>
+        </Link>
+        <Link href="/settings" asChild>
+          <Pressable accessibilityRole="link" accessibilityLabel="Settings">
+            <View style={[styles.miniBox, pathname === '/settings' && [styles.active, { backgroundColor: theme.card }]]}>
+              <Icon name="settings" size={22} color={pathname === '/settings' ? 'primary' : 'textSecondary'} />
+            </View>
+          </Pressable>
+        </Link>
       </View>
     </ScrollView>
   );

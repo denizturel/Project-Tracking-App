@@ -10,6 +10,9 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { WIDE_SCREEN, WorkspaceProvider } from '@/lib/workspace';
 
+/** The same project or group is the same page, whichever of its tabs is asked for. */
+const onePerPage = (name: string, params: Record<string, unknown>) => `${name}:${String(params.id ?? '')}`;
+
 export default function AppLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -67,9 +70,12 @@ export default function AppLayout() {
                 </View>
               ),
             }}>
-            <Stack.Screen name="index" options={{ title: 'Projects' }} />
-            <Stack.Screen name="project/[id]" options={{ title: 'Project' }} />
-            <Stack.Screen name="group/[id]" options={{ title: 'Group' }} />
+            {/* One copy of each page: opening a page that is already open goes back to it instead of stacking another. */}
+            <Stack.Screen name="index" options={{ title: 'Projects' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="project/[id]" options={{ title: 'Project' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="group/[id]" options={{ title: 'Group' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="profile" options={{ title: 'Profile' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="settings" options={{ title: 'Settings' }} dangerouslySingular={onePerPage} />
           </Stack>
         </View>
       </View>
