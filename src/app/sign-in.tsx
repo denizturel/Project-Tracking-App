@@ -18,9 +18,10 @@ export default function SignInScreen() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // Sign-in with a one-time link sent by email, for accounts that already exist.
+  // Sign-in with a one-time code or link sent by email, for accounts that already exist.
   const [useCode, setUseCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'email' | 'google' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -31,15 +32,25 @@ export default function SignInScreen() {
   const withCode = useCode && !creating;
   const emailFilled = email.trim().length > 3;
   const canSubmit = withCode
-    ? emailFilled && !codeSent
+    ? emailFilled && (!codeSent || code.trim().length >= 6)
     : emailFilled && password.length >= 6 && (!creating || detailsFilled);
 
-  // The email holds a sign-in link. A typed 6-digit code needs our own email
-  // service in Supabase first (its built-in sender does not allow changing the email).
+  // The email holds a sign-in link, and a 6-digit code once the "Magic Link" email
+  // text in Supabase includes {{ .Token }}. Either one signs the person in.
   async function submitCode() {
     setBusy('email');
     setError(null);
     setNotice(null);
+    if (codeSent) {
+      const { error: failed } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: code.trim(),
+        type: 'email',
+      });
+      if (failed) setError('That code is wrong or has expired. Check it or ask for a new one.');
+      setBusy(null);
+      return;
+    }
     const { error: failed } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
@@ -57,7 +68,7 @@ export default function SignInScreen() {
     } else {
       setCodeSent(true);
       setNotice(
-        'We sent a sign-in link to your email. Open it on this device, in this same browser, and you are signed in.',
+        'We sent you an email. Type the code from it below, or open the link in it on this device.',
       );
     }
     setBusy(null);
@@ -65,6 +76,7 @@ export default function SignInScreen() {
 
   function resetCode() {
     setCodeSent(false);
+    setCode('');
     setError(null);
     setNotice(null);
   }
@@ -204,8 +216,19 @@ export default function SignInScreen() {
           </ThemedText>
         )}
 
-        <ErrorText>{error}</ErrorText>
         {notice && <ThemedText type="small">{notice}</ThemedText>}
+        {withCode && codeSent && (
+          <Field
+            label="Code from the email"
+            value={code}
+            onChangeText={setCode}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+            onSubmitEditing={() => canSubmit && submit()}
+          />
+        )}
+        <ErrorText>{error}</ErrorText>
 
         <Button
           title={
@@ -217,7 +240,7 @@ export default function SignInScreen() {
         />
         {withCode && codeSent && (
           <Button
-            title="Send a new link"
+            title="Send a new code"
             variant="plain"
             onPress={resetCode}
             disabled={busy !== null}
