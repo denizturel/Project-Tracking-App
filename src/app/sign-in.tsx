@@ -20,11 +20,10 @@ const LANGUAGES = [
 const GOOGLE_SIGN_IN: boolean = false;
 
 /**
- * Doneva has no email service yet (it needs its own domain first), so everything that sends an email is
- * switched off: "Forgot your password?" is hidden. The code screens stay in the file and only open if
- * Supabase itself asks for a confirmed email. Set to true once the email service is connected in Supabase.
+ * Emails (confirmation code, password reset code) go out through Resend from donevaapp.com, set up in
+ * Supabase. Set to false to hide "Forgot your password?" if the email service is ever switched off.
  */
-const EMAIL_SERVICE: boolean = false;
+const EMAIL_SERVICE: boolean = true;
 
 export default function SignInScreen() {
   const { lang } = usePrefs();
