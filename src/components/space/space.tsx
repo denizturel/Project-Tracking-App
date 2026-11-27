@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensio
 import { Chat } from '@/components/space/chat';
 import { Overview, Places } from '@/components/space/overview';
 import { People } from '@/components/space/people';
+import { fetchProjectPeople, type PersonRow } from '@/lib/project-people';
 import { Questions } from '@/components/space/questions';
 import { Schedule } from '@/components/space/schedule';
 import { Tasks } from '@/components/space/tasks';
@@ -165,11 +166,12 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
   const openQuestions = useRows<OpenRow>(`space3:${project.id}`, () =>
     supabase.from('questions').select('subgroup_id').eq('project_id', project.id).neq('status', 'solved').returns<OpenRow[]>(),
   );
-  const people = useRows<{ user_id: string; subgroup_id?: string }>(`space1:${project.id}:${subgroup?.id ?? ''}:${children.length}`, () =>
-    tree
-      ? supabase.from('subgroup_members').select('user_id, subgroup_id').in('subgroup_id', tree).returns<{ user_id: string }[]>()
-      : supabase.from('project_members').select('user_id').eq('project_id', project.id).returns<{ user_id: string }[]>(),
-  );
+  // Counts people who are present through a higher status too (company admins, project admins, group managers).
+  const everyone = useRows<PersonRow>(`space1:${project.id}:${children.length}`, async () => {
+    const loaded = await fetchProjectPeople(project.id);
+    return { data: [...loaded.project, ...loaded.placed], error: loaded.error ? { message: loaded.error } : null };
+  });
+  const people = { rows: everyone.rows.filter((p) => (tree ? tree.includes(p.subgroup_id ?? '') : !p.subgroup_id)) };
   const peopleCount = new Set(people.rows.map((p) => p.user_id)).size;
   const taskCount = within(openTasks.rows);
   const questionCount = within(openQuestions.rows);

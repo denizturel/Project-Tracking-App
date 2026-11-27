@@ -6,6 +6,7 @@ import { ScheduleCard, type ScheduleView, dateText, statusOf, useMilestones } fr
 import { inScope, placeName } from '@/components/space/scope';
 import { type SpaceInfo } from '@/components/space/space';
 import { Link } from '@/components/go';
+import { placedRows, projectRows, type PersonRow } from '@/lib/project-people';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, EditedLabel, ErrorText, Field, Icon, TextButton, MoreMenu } from '@/components/ui';
 import { Spacing, type ThemeColor } from '@/constants/theme';
@@ -20,12 +21,6 @@ export const MARKS: ThemeColor[] = ['primary', 'lavenderInk', 'ok', 'skyInk', 'w
 type TaskRow = { id: string; subgroup_id: string | null; title: string; due_date: string | null; completed_at: string | null };
 type QuestionRow = { id: string; subgroup_id: string | null; title: string; status: string; created_at: string };
 type TrainingRow = { id: string; subgroup_id: string | null };
-type PersonRow = {
-  user_id: string;
-  role?: string;
-  subgroup_id?: string;
-  profile: { full_name: string; position: string | null; company_name: string | null } | null;
-};
 
 const shortDate = (value: string) =>
   new Date(`${value}T00:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
@@ -73,20 +68,9 @@ export function Overview({ info }: { info: SpaceInfo }) {
   const training = useRows<TrainingRow>(`overview5:${key}`, () =>
     supabase.from('training_items').select('id, subgroup_id').eq('project_id', project.id).returns<TrainingRow[]>(),
   );
-  const members = useRows<PersonRow>(`overview6:${key}`, () =>
-    supabase
-      .from('project_members')
-      .select('user_id, role, profile:profiles!user_id(full_name, position, company_name)')
-      .eq('project_id', project.id)
-      .returns<PersonRow[]>(),
-  );
-  const placed = useRows<PersonRow>(`overview1:${key}:${subgroups.length}`, () =>
-    supabase
-      .from('subgroup_members')
-      .select('user_id, subgroup_id, profile:profiles!user_id(full_name, position, company_name)')
-      .in('subgroup_id', subgroups.filter((s) => s.project_id === project.id).map((s) => s.id))
-      .returns<PersonRow[]>(),
-  );
+  // Both lists count people who are present through a higher status (company admins, project admins, group managers).
+  const members = useRows<PersonRow>(`overview6:${key}`, projectRows(project.id));
+  const placed = useRows<PersonRow>(`overview1:${key}:${subgroups.length}`, placedRows(project.id));
 
   const here = <T extends { subgroup_id: string | null }>(rows: T[]) =>
     rows.filter((row) => inScope(info, subgroups, row.subgroup_id));
@@ -445,13 +429,7 @@ export function Places({ info }: { info: SpaceInfo }) {
   const { project, subgroup, level } = info;
   const isAdmin = info.isFullAdmin;
   const ids = subgroups.filter((s) => s.project_id === project.id).map((s) => s.id);
-  const placed = useRows<PersonRow>(`overview2:${project.id}:${ids.length}`, () =>
-    supabase
-      .from('subgroup_members')
-      .select('user_id, subgroup_id, profile:profiles!user_id(full_name, position, company_name)')
-      .in('subgroup_id', ids)
-      .returns<PersonRow[]>(),
-  );
+  const placed = useRows<PersonRow>(`overview2:${project.id}:${ids.length}`, placedRows(project.id));
   const questions = useRows<{ subgroup_id: string | null }>(`overview7:${project.id}`, () =>
     supabase
       .from('questions')

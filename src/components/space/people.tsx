@@ -12,16 +12,12 @@ import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
 import { useLiveVersion } from '@/lib/live';
 import { shareLink } from '@/lib/join-link';
+import { fetchProjectPeople, type PersonRow } from '@/lib/project-people';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
 
-type Person = {
-  user_id: string;
-  role?: 'admin' | 'manager' | 'member';
-  subgroup_id?: string;
-  profile: { full_name: string; position: string | null; company_name: string | null; username?: string | null } | null;
-};
+type Person = PersonRow;
 
 type Invitation = { id: string; email: string; token: string; project_role: 'admin' | 'member' };
 
@@ -34,14 +30,11 @@ type Loaded = {
   error: string | null;
 };
 
-const PROFILE = 'profile:profiles!user_id(full_name, position, company_name, username)';
-
-async function fetchPeople(info: SpaceInfo, subgroupIds: string[]): Promise<Loaded> {
-  const [project, placed, invitations] = await Promise.all([
-    supabase.from('project_members').select(`user_id, role, ${PROFILE}`).eq('project_id', info.project.id),
-    subgroupIds.length
-      ? supabase.from('subgroup_members').select(`user_id, subgroup_id, role, ${PROFILE}`).in('subgroup_id', subgroupIds)
-      : null,
+async function fetchPeople(info: SpaceInfo): Promise<Loaded> {
+  const [people, invitations] = await Promise.all([
+    // Includes people who are present through a higher status: company admins in every project,
+    // project admins in every group and team, a group's managers in its teams.
+    fetchProjectPeople(info.project.id),
     info.isAdmin && !info.subgroup
       ? supabase
           .from('invitations')
@@ -51,13 +44,11 @@ async function fetchPeople(info: SpaceInfo, subgroupIds: string[]): Promise<Load
           .order('email')
       : null,
   ]);
-  const byName = (a: Person, b: Person) =>
-    (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? '');
   return {
-    project: ((project.data ?? []) as unknown as Person[]).sort(byName),
-    placed: ((placed?.data ?? []) as unknown as Person[]).sort(byName),
+    project: people.project,
+    placed: people.placed,
     invitations: (invitations?.data ?? []) as Invitation[],
-    error: (project.error ?? placed?.error ?? invitations?.error)?.message ?? null,
+    error: people.error ?? invitations?.error?.message ?? null,
   };
 }
 
@@ -102,7 +93,7 @@ export function People({ info }: { info: SpaceInfo }) {
 
   useEffect(() => {
     let active = true;
-    fetchPeople(info, idsKey ? idsKey.split(',') : []).then((result) => {
+    fetchPeople(info).then((result) => {
       if (active) setData(result);
     });
     return () => {
@@ -191,7 +182,8 @@ export function People({ info }: { info: SpaceInfo }) {
         <View>
           {people.map((person, index) => {
             const status = statusOf(person.user_id);
-            const where = inScope(person.user_id).map((p) => nameOf(p.subgroup_id));
+            // People present through a higher status are not listed place by place.
+            const where = inScope(person.user_id).filter((p) => !p.inherited).map((p) => nameOf(p.subgroup_id));
             return (
               <Pressable
                 key={person.user_id}
@@ -251,7 +243,9 @@ export function People({ info }: { info: SpaceInfo }) {
           onClose={() => setOpenId(null)}
           status={statusOf(open.user_id)}
           manages={managedBy(open.user_id).map((g) => g.name)}
-          canChangeStatus={isProjectAdmin && open.user_id !== me}
+          // A company owner or admin is admin here through the company; that is changed on the company page.
+          canChangeStatus={isProjectAdmin && open.user_id !== me && !open.inherited}
+          throughCompany={!!open.inherited}
           groups={groups.map((g) => ({ id: g.id, name: g.name }))}
           onStatus={(status, groupId) => {
             const id = open.user_id;
@@ -261,7 +255,7 @@ export function People({ info }: { info: SpaceInfo }) {
             return run(setProjectRole(id, 'member'), ...noLongerManager(id));
           }}
           onRemoveFromProject={
-            isProjectAdmin && open.user_id !== me && !subgroup
+            isProjectAdmin && open.user_id !== me && !subgroup && !open.inherited
               ? () => {
                   setOpenId(null);
                   return run(() => supabase.from('project_members').delete().eq('project_id', project.id).eq('user_id', open.user_id));
@@ -269,7 +263,7 @@ export function People({ info }: { info: SpaceInfo }) {
               : null
           }
           places={placedOf(open.user_id)
-            .filter((p) => all.some((s) => s.id === p.subgroup_id))
+            .filter((p) => !p.inherited && all.some((s) => s.id === p.subgroup_id))
             .map((placed) => {
               const item = all.find((s) => s.id === placed.subgroup_id) as SubgroupNode;
               const mine = scope.some((s) => s.id === item.id);
@@ -306,6 +300,8 @@ type ProfileCardProps = {
   /** Names of the groups this person manages. */
   manages: string[];
   canChangeStatus: boolean;
+  /** Admin here because they are owner or admin of the whole company. */
+  throughCompany: boolean;
   groups: { id: string; name: string }[];
   onStatus: (status: Status, groupId?: string) => void;
   onRemoveFromProject: (() => void) | null;
@@ -315,7 +311,7 @@ type ProfileCardProps = {
 
 /** The small card of one person: name, role (their job) and status. Pressing the status shows the other options. */
 function ProfileCard(props: ProfileCardProps) {
-  const { person, isMe, onClose, status, manages, canChangeStatus, groups, onStatus, onRemoveFromProject, places, canAddTo } = props;
+  const { person, isMe, onClose, status, manages, canChangeStatus, throughCompany, groups, onStatus, onRemoveFromProject, places, canAddTo } = props;
   const theme = useTheme();
   const [changing, setChanging] = useState(false);
   const [pickGroup, setPickGroup] = useState(false);
@@ -389,7 +385,7 @@ function ProfileCard(props: ProfileCardProps) {
             )}
             {!changing && (
               <ThemedText type="small" themeColor="textSecondary">
-                {STATUS_HINT[status]}
+                {throughCompany ? 'Admin of the whole company, so also admin in every project, group and team of it.' : STATUS_HINT[status]}
               </ThemedText>
             )}
             {changing && (
