@@ -215,6 +215,15 @@ export function Overview({ info }: { info: SpaceInfo }) {
       </>
     ) : (
       <>
+        {level === 'group' && info.simple && info.isFullAdmin && (
+          <Card>
+            <ThemedText type="label">Teams in this group</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              This group has no teams yet. Teams are smaller groups inside it, each with their own chat, tasks and questions.
+            </ThemedText>
+            <Button title="New team" icon="plus" variant="secondary" small onPress={() => go('Teams')} />
+          </Card>
+        )}
         {level === 'group' && !info.simple && (
           <Card>
             <View style={styles.between}>

@@ -240,7 +240,8 @@ export function Sidebar() {
                                     </View>
                                   );
                                 })}
-                                {!groupSimple && (project.myRole === 'admin' || adminSubgroups.includes(group.id)) && (
+                                {/* Also in the simple layout, or the first team of a project could never be made. */}
+                                {(project.myRole === 'admin' || adminSubgroups.includes(group.id)) && (
                                   <Row
                                     href={{ pathname: '/group/[id]', params: { id: group.id, tab: 'Teams' } }}
                                     label="New team"

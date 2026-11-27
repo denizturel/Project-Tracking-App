@@ -31,6 +31,8 @@ export const TR: Record<string, string> = {
   Messages: 'Mesajlar',
   'No projects yet. Create one from All projects.': 'Henüz proje yok. Tüm projeler ekranından oluşturun.',
   'No projects here yet.': 'Burada henüz proje yok.',
+  'This group has no teams yet. Teams are smaller groups inside it, each with their own chat, tasks and questions.':
+    'Bu grupta henüz ekip yok. Ekipler grubun içindeki daha küçük gruplardır; her birinin kendi sohbeti, görevleri ve soruları olur.',
   'Privacy policy': 'Gizlilik politikası',
   'Terms of use': 'Kullanım koşulları',
   'By creating an account you accept the terms of use and the privacy policy below.': 'Hesap oluşturarak aşağıdaki kullanım koşullarını ve gizlilik politikasını kabul etmiş olursunuz.',
