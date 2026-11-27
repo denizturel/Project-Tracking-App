@@ -19,6 +19,13 @@ const LANGUAGES = [
 /** Google sign-in is switched off in Supabase for now. Set to true once the Google provider is turned on there. */
 const GOOGLE_SIGN_IN: boolean = false;
 
+/**
+ * Doneva has no email service yet (it needs its own domain first), so everything that sends an email is
+ * switched off: "Forgot your password?" is hidden. The code screens stay in the file and only open if
+ * Supabase itself asks for a confirmed email. Set to true once the email service is connected in Supabase.
+ */
+const EMAIL_SERVICE: boolean = false;
+
 export default function SignInScreen() {
   const { lang } = usePrefs();
   const { signInWithGoogle } = useAuth();
@@ -369,7 +376,7 @@ export default function SignInScreen() {
           }}
           disabled={busy !== null}
         />
-        {!creating && (
+        {EMAIL_SERVICE && !creating && (
           <Button
             title="Forgot your password?"
             variant="plain"
