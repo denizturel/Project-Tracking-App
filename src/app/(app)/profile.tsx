@@ -8,13 +8,16 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
 import { WIDE_SCREEN } from '@/lib/workspace';
+import { cleanPhone, joinName, phoneProblem, splitName } from '@/lib/form-rules';
 import { supabase } from '@/lib/supabase';
 
 /** Your own details, as teammates see them next to your name. */
 export default function ProfileScreen() {
   const { session, profile, refreshProfile } = useAuth();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
-  const [fullName, setFullName] = useState(profile?.full_name ?? '');
+  const [firstName, setFirstName] = useState(splitName(profile?.full_name).first);
+  const [lastName, setLastName] = useState(splitName(profile?.full_name).last);
+  const fullName = joinName(firstName, lastName);
   const [company, setCompany] = useState(profile?.company_name ?? '');
   const [position, setPosition] = useState(profile?.position ?? '');
   const [department, setDepartment] = useState(profile?.department ?? '');
@@ -26,13 +29,13 @@ export default function ProfileScreen() {
   const [saved, setSaved] = useState(false);
 
   const changed =
-    fullName.trim() !== (profile?.full_name ?? '') ||
+    fullName !== (profile?.full_name ?? '') ||
     cleanUsername(username) !== (profile?.username ?? '') ||
     company.trim() !== (profile?.company_name ?? '') ||
     position.trim() !== (profile?.position ?? '') ||
     department.trim() !== (profile?.department ?? '') ||
-    phone.trim() !== (profile?.phone ?? '');
-  const canSave = changed && !!fullName.trim() && !!company.trim() && !!position.trim() && usernameOk;
+    (cleanPhone(phone) ?? phone.trim()) !== (profile?.phone ?? '');
+  const canSave = changed && !!firstName.trim() && !!lastName.trim() && !!company.trim() && !!position.trim() && usernameOk && !phoneProblem(phone);
 
   async function save() {
     if (!session) return;
@@ -42,12 +45,12 @@ export default function ProfileScreen() {
     const { error: failed } = await supabase
       .from('profiles')
       .update({
-        full_name: fullName.trim(),
+        full_name: fullName,
         username: cleanUsername(username),
         company_name: company.trim(),
         position: position.trim(),
         department: department.trim() || null,
-        phone: phone.trim() || null,
+        phone: cleanPhone(phone),
       })
       .eq('id', session.user.id);
     if (failed) setError(failed.code === '23505' ? 'This username is taken. Try another one.' : failed.message);
@@ -85,12 +88,29 @@ export default function ProfileScreen() {
           <ThemedText type="small" themeColor="textSecondary">
             Teammates see these next to your name. Fields with * are required.
           </ThemedText>
-          <Field label="Full name" required value={fullName} onChangeText={setFullName} autoComplete="name" />
+          <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+            <View style={{ flex: 1 }}>
+              <Field label="Name" required value={firstName} onChangeText={setFirstName} autoComplete="given-name" textContentType="givenName" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field label="Surname" required value={lastName} onChangeText={setLastName} autoComplete="family-name" textContentType="familyName" />
+            </View>
+          </View>
           <UsernameField value={username} onChangeText={setUsername} onValid={setUsernameOk} />
           <Field label="Company" required value={company} onChangeText={setCompany} autoComplete="organization" />
           <Field label="Position" required value={position} onChangeText={setPosition} autoComplete="organization-title" />
           <Field label="Department" value={department} onChangeText={setDepartment} />
-          <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" />
+          <Field
+            label="Phone"
+            value={phone}
+            onChangeText={setPhone}
+            onBlur={() => setPhone(cleanPhone(phone) ?? phone)}
+            placeholder="+90 532 123 45 67"
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+          />
+          <ErrorText>{phoneProblem(phone)}</ErrorText>
           <ErrorText>{error}</ErrorText>
           {saved && !changed && (
             <ThemedText type="small" themeColor="textSecondary">

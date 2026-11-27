@@ -9,6 +9,7 @@ import { useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
 import { setLang, setMode, usePrefs } from '@/lib/prefs';
 import { WIDE_SCREEN } from '@/lib/workspace';
+import { PASSWORD_RULE, passwordProblem } from '@/lib/form-rules';
 import { supabase } from '@/lib/supabase';
 
 const LANGUAGES = [
@@ -111,7 +112,7 @@ function Security() {
 
   const email = session?.user.email ?? '';
   const mismatch = !!again && next !== again;
-  const canChange = !!current && next.length >= 8 && next === again;
+  const canChange = !!current && !!next && !passwordProblem(next) && next === again;
 
   async function changePassword() {
     setBusy(true);
@@ -152,7 +153,10 @@ function Security() {
       <Card>
         <ThemedText type="heading">Change password</ThemedText>
         <Field label="Current password" value={current} onChangeText={setCurrent} secureTextEntry autoComplete="current-password" />
-        <Field label="New password (at least 8 characters)" value={next} onChangeText={setNext} secureTextEntry autoComplete="new-password" />
+        <Field label="New password" value={next} onChangeText={setNext} secureTextEntry autoComplete="new-password" />
+        <ThemedText type="small" themeColor={passwordProblem(next) ? 'danger' : 'textSecondary'}>
+          {PASSWORD_RULE}
+        </ThemedText>
         <Field label="New password again" value={again} onChangeText={setAgain} secureTextEntry autoComplete="new-password" />
         <ErrorText>{mismatch ? 'The two new passwords are not the same.' : error}</ErrorText>
         {changed && (
