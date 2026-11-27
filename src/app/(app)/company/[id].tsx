@@ -50,7 +50,7 @@ function CompanyPage({ company }: { company: CompanyNode }) {
   const router = useRouter();
   const { session } = useAuth();
   const me = session?.user.id;
-  const { projects, reload: reloadWorkspace } = useWorkspace();
+  const { projects, reload: reloadWorkspace, togglePin } = useWorkspace();
   const owner = company.role === 'owner';
   const admin = owner || company.role === 'admin';
 
@@ -106,7 +106,17 @@ function CompanyPage({ company }: { company: CompanyNode }) {
             <ThemedText themeColor="textSecondary">Company space</ThemedText>
           </View>
           <Chip text={ROLE_WORDS[company.role]} tone="lavender" />
-          {owner && !renaming && <MoreMenu actions={[{ title: 'Rename company', onPress: () => setRenaming(true) }]} />}
+          {!renaming && (
+            <MoreMenu
+              actions={[
+                {
+                  title: company.pinned ? 'Unpin from the top' : 'Pin to the top',
+                  onPress: async () => setFailed(await togglePin('companies', company.id)),
+                },
+                owner && { title: 'Rename company', onPress: () => setRenaming(true) },
+              ]}
+            />
+          )}
         </View>
         {renaming && (
           <>

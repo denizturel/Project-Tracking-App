@@ -119,9 +119,12 @@ export function Sidebar() {
                 </ThemedText>
               </View>
               <View style={styles.grow}>
-                <ThemedText type="heading" numberOfLines={1}>
-                  {company.name}
-                </ThemedText>
+                <View style={styles.pinLine}>
+                  <ThemedText type="heading" numberOfLines={1} style={styles.shrink}>
+                    {company.name}
+                  </ThemedText>
+                  {company.pinned && <Icon name="bookmark" size={15} color="primary" />}
+                </View>
                 <ThemedText type="small" themeColor="textSecondary">
                   Company space
                 </ThemedText>
@@ -151,7 +154,7 @@ export function Sidebar() {
                   <Row
                     href={{ pathname: '/project/[id]', params: { id: project.id } }}
                     label={project.name}
-                    icon="folder"
+                    icon={project.pinned ? 'bookmark' : 'folder'}
                     depth={0}
                     bold
                     active={false}
@@ -480,6 +483,8 @@ function Row({ href, label, depth, icon, bold, small, mark, active, folded, onTo
 }
 
 const styles = StyleSheet.create({
+  pinLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  shrink: { flexShrink: 1 },
   content: { padding: 10, gap: 2, paddingBottom: Spacing.five },
   dot: { position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: 5 },
   badge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },

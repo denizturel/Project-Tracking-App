@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, ErrorText, Field, Icon } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { fold } from '@/lib/fold';
 import { locale } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
@@ -22,12 +23,18 @@ type Hit = {
 const KIND_WORD: Record<Hit['kind'], string> = { message: 'Message', question: 'Question', solution: 'Solution', task: 'Task' };
 const when = (iso: string) => new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
 
-/** Searches every chat, question, solution and task you can see. Turkish letters do not matter ("sifre" finds "Şifre"). */
+type Place = { key: string; name: string; kind: 'Company' | 'Project' | 'Group' | 'Team'; where: string; open: () => void };
+
+/**
+ * One search bar for everything: companies, projects, groups and teams show up while typing,
+ * and Search also looks in every chat, question, solution and task you can see.
+ * Turkish letters do not matter ("sifre" finds "Şifre").
+ */
 export default function SearchScreen() {
   const theme = useTheme();
   const router = useRouter();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
-  const { projects } = useWorkspace();
+  const { companies, projects, subgroups } = useWorkspace();
   const [text, setText] = useState('');
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [asked, setAsked] = useState('');
@@ -62,13 +69,33 @@ export default function SearchScreen() {
 
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name ?? '';
 
+  // Companies, projects, groups and teams are already on the device, so they are found while typing.
+  const typed = fold(text.trim());
+  const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? '';
+  const places: Place[] =
+    typed.length < 2
+      ? []
+      : [
+          ...companies.map((c): Place => ({ key: `c${c.id}`, name: c.name, kind: 'Company', where: '', open: () => router.push({ pathname: '/company/[id]', params: { id: c.id } }) })),
+          ...projects.map((p): Place => ({ key: `p${p.id}`, name: p.name, kind: 'Project', where: companyName(p.company_id), open: () => router.push({ pathname: '/project/[id]', params: { id: p.id } }) })),
+          ...subgroups.map(
+            (s): Place => ({
+              key: `s${s.id}`,
+              name: s.name,
+              kind: s.parent_id ? 'Team' : 'Group',
+              where: [projectName(s.project_id), s.parent_id ? subgroups.find((g) => g.id === s.parent_id)?.name : null].filter(Boolean).join(' · '),
+              open: () => router.push({ pathname: '/group/[id]', params: { id: s.id } }),
+            }),
+          ),
+        ].filter((place) => fold(place.name).includes(typed));
+
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={styles.column}>
         {wide && <ThemedText type="title">Search</ThemedText>}
         <Card>
           <Field
-            label="Search messages, questions, solutions and tasks"
+            label="Search companies, projects, groups, teams, messages, questions and tasks"
             value={text}
             onChangeText={setText}
             autoCapitalize="none"
@@ -80,8 +107,37 @@ export default function SearchScreen() {
           <ErrorText>{error}</ErrorText>
         </Card>
 
+        {places.length > 0 && (
+          <Card style={{ gap: 0, paddingVertical: 4 }}>
+            {places.slice(0, 20).map((place, index) => (
+              <Pressable
+                key={place.key}
+                accessibilityRole="button"
+                onPress={place.open}
+                style={({ pressed }) => [
+                  styles.row,
+                  index > 0 && { borderTopWidth: 1, borderTopColor: theme.border },
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}>
+                <View style={styles.grow}>
+                  <ThemedText type="bold" raw numberOfLines={1}>
+                    {place.name}
+                  </ThemedText>
+                  <View style={styles.meta}>
+                    <Chip text={place.kind} tone={place.kind === 'Company' ? 'accent' : place.kind === 'Project' ? 'sky' : 'lavender'} />
+                    <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1} style={styles.grow}>
+                      {place.where}
+                    </ThemedText>
+                  </View>
+                </View>
+                <Icon name="chevron-right" size={18} color="textSecondary" />
+              </Pressable>
+            ))}
+          </Card>
+        )}
+
         {busy && !hits && <ActivityIndicator color={theme.primary} size="large" />}
-        {hits && hits.length === 0 && (
+        {hits && hits.length === 0 && places.length === 0 && (
           <ThemedText themeColor="textSecondary" raw={false}>
             Nothing found.
           </ThemedText>
@@ -124,7 +180,7 @@ export default function SearchScreen() {
         )}
         {!hits && !busy && !asked && (
           <ThemedText type="small" themeColor="textSecondary">
-            Looks in every chat, question, solution and task you can see. Turkish letters do not matter.
+            Companies, projects, groups and teams appear while you type. Press Search to also look in every chat, question, solution and task you can see. Turkish letters do not matter.
           </ThemedText>
         )}
       </View>

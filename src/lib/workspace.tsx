@@ -6,8 +6,8 @@ import { useAuth } from '@/lib/auth';
 import { somethingChanged, useLiveVersion } from '@/lib/live';
 import { type Company, type CompanyRole, type Project, type Subgroup, supabase } from '@/lib/supabase';
 
-export type CompanyNode = Company & { role: CompanyRole };
-export type ProjectNode = Project & { myRole: 'admin' | 'member' | null; editor: string | null };
+export type CompanyNode = Company & { role: CompanyRole; pinned: boolean };
+export type ProjectNode = Project & { myRole: 'admin' | 'member' | null; editor: string | null; pinned: boolean };
 export type SubgroupNode = Subgroup & { edited_at: string | null; editor: string | null };
 
 type Tree = {
@@ -25,7 +25,12 @@ type WorkspaceValue = Tree & {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /** Pins or unpins a company or project for this person (2 of each at most). Gives back what went wrong, if anything. */
+  togglePin: (kind: 'companies' | 'projects', id: string) => Promise<string | null>;
 };
+
+/** How many companies, and how many projects, one person can pin to the top (decided by Deniz). */
+const MAX_PINS = 2;
 
 const empty: Tree = { companies: [], projects: [], subgroups: [], adminSubgroups: [], managerSubgroups: [] };
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
@@ -41,7 +46,7 @@ const editorName = (value: unknown) => (value as Editor)?.full_name ?? null;
 
 /** Everything the signed-in person may see: the database rules do the filtering. */
 async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: string | null }> {
-  const [memberships, projects, roles, subgroups, ownGroups] = await Promise.all([
+  const [memberships, projects, roles, subgroups, ownGroups, pins] = await Promise.all([
     supabase.from('company_members').select('role, companies(id, name)').eq('user_id', userId),
     supabase
       .from('projects')
@@ -57,6 +62,7 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
       )
       .order('name'),
     supabase.from('subgroup_members').select('subgroup_id, role').eq('user_id', userId).in('role', ['admin', 'manager']),
+    supabase.from('user_pins').select('companies, projects').eq('user_id', userId).maybeSingle(),
   ]);
   const failed =
     memberships.error ?? projects.error ?? roles.error ?? subgroups.error ?? ownGroups.error;
@@ -64,10 +70,16 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
 
   const roleOf = new Map((roles.data ?? []).map((r) => [r.project_id as string, r.role as 'admin' | 'member']));
 
-  const companies = (memberships.data ?? []).flatMap((row) => {
-    const company = row.companies as unknown as Company | null;
-    return company ? [{ ...company, role: row.role as CompanyRole }] : [];
-  });
+  // Pinned companies and projects come first (2 of each at most, chosen by the person).
+  const pinned = (pins.data ?? { companies: [], projects: [] }) as { companies: string[]; projects: string[] };
+  const pinnedFirst = <T extends { pinned: boolean }>(list: T[]) => [...list.filter((x) => x.pinned), ...list.filter((x) => !x.pinned)];
+
+  const companies = pinnedFirst(
+    (memberships.data ?? []).flatMap((row) => {
+      const company = row.companies as unknown as Company | null;
+      return company ? [{ ...company, role: row.role as CompanyRole, pinned: pinned.companies.includes(company.id) }] : [];
+    }),
+  );
   // Company owners and admins manage every project in their company.
   const managed = new Set(companies.filter((c) => c.role === 'owner' || c.role === 'admin').map((c) => c.id));
 
@@ -79,11 +91,14 @@ async function fetchTree(userId: string): Promise<{ tree: Tree | null; error: st
       managerSubgroups: (ownGroups.data ?? [])
         .filter((row) => row.role === 'manager')
         .map((row) => row.subgroup_id as string),
-      projects: (projects.data ?? []).map(({ editor, ...p }) => ({
-        ...(p as Project),
-        myRole: managed.has(p.company_id) ? 'admin' : (roleOf.get(p.id) ?? null),
-        editor: editorName(editor),
-      })),
+      projects: pinnedFirst(
+        (projects.data ?? []).map(({ editor, ...p }) => ({
+          ...(p as Project),
+          myRole: managed.has(p.company_id) ? ('admin' as const) : (roleOf.get(p.id) ?? null),
+          editor: editorName(editor),
+          pinned: pinned.projects.includes(p.id),
+        })),
+      ),
       subgroups: (subgroups.data ?? []).map(({ editor, ...s }) => ({
         ...(s as Subgroup & { edited_at: string | null }),
         editor: editorName(editor),
@@ -137,9 +152,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, [userId, version, live]);
 
+  const togglePin = useCallback(
+    async (kind: 'companies' | 'projects', id: string) => {
+      if (!userId || !tree) return null;
+      const now = { companies: tree.companies.filter((c) => c.pinned).map((c) => c.id), projects: tree.projects.filter((p) => p.pinned).map((p) => p.id) };
+      const has = now[kind].includes(id);
+      if (!has && now[kind].length >= MAX_PINS) return kind === 'companies' ? 'You can pin 2 companies at most. Unpin one first.' : 'You can pin 2 projects at most. Unpin one first.';
+      const next = { ...now, [kind]: has ? now[kind].filter((x) => x !== id) : [...now[kind], id] };
+      const { error: failed } = await supabase.from('user_pins').upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() });
+      if (failed) return failed.message;
+      reload();
+      return null;
+    },
+    [userId, tree, reload],
+  );
+
   const value = useMemo(
-    () => ({ ...(tree ?? empty), loading: tree === null && error === null, error, reload }),
-    [tree, error, reload],
+    () => ({ ...(tree ?? empty), loading: tree === null && error === null, error, reload, togglePin }),
+    [tree, error, reload, togglePin],
   );
 
   return <WorkspaceContext value={value}>{children}</WorkspaceContext>;

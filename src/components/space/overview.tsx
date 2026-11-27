@@ -590,6 +590,8 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
     setEditingHere(value);
     if (!value && params.edit) router.setParams({ edit: undefined });
   };
+  const { projects: allProjects, togglePin } = useWorkspace();
+  const pinnedHere = level === 'project' && !!allProjects.find((p) => p.id === item.id)?.pinned;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState(item.name);
   const [description, setDescription] = useState(item.description ?? '');
@@ -664,13 +666,18 @@ function Details({ info, groupNames, note }: { info: SpaceInfo; groupNames: stri
       )}
       <EditedLabel name={item.editor} at={item.edited_at} />
       <ErrorText>{error}</ErrorText>
-      {isAdmin && (
+      {(isAdmin || level === 'project') && (
         <View style={styles.actions}>
           {!confirmDelete && (
             <MoreMenu
               actions={[
-                { title: `Edit ${level}`, onPress: () => setEditing(true) },
-                canDelete && { title: `Delete this ${level}`, danger: true, onPress: () => setConfirmDelete(true) },
+                // Everyone can pin a project to the top of their own lists.
+                level === 'project' && {
+                  title: pinnedHere ? 'Unpin from the top' : 'Pin to the top',
+                  onPress: async () => setError(await togglePin('projects', item.id)),
+                },
+                isAdmin && { title: `Edit ${level}`, onPress: () => setEditing(true) },
+                isAdmin && canDelete && { title: `Delete this ${level}`, danger: true, onPress: () => setConfirmDelete(true) },
               ]}
             />
           )}

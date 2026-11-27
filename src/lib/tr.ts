@@ -31,6 +31,18 @@ export const TR: Record<string, string> = {
   Messages: 'Mesajlar',
   'No projects yet. Create one from All projects.': 'Henüz proje yok. Tüm projeler ekranından oluşturun.',
   'No projects here yet.': 'Burada henüz proje yok.',
+  'You can pin 2 projects at most. Unpin one first.':
+    'En fazla 2 proje sabitleyebilirsiniz. Önce birini kaldırın.',
+  'You can pin 2 companies at most. Unpin one first.':
+    'En fazla 2 şirket sabitleyebilirsiniz. Önce birini kaldırın.',
+  'Unpin from the top':
+    'Sabitlemeyi kaldır',
+  'Pin to the top':
+    'En üste sabitle',
+  'Companies, projects, groups and teams appear while you type. Press Search to also look in every chat, question, solution and task you can see. Turkish letters do not matter.':
+    "Şirketler, projeler, gruplar ve ekipler yazarken görünür. Görebildiğiniz tüm sohbet, soru, çözüm ve görevlerde de aramak için Ara'ya basın. Türkçe harfler fark etmez.",
+  'Search companies, projects, groups, teams, messages, questions and tasks':
+    'Şirket, proje, grup, ekip, mesaj, soru ve görev ara',
   'Admin of the whole company, so also admin in every project, group and team of it.':
     'Tüm şirketin yöneticisi; bu yüzden şirketin her projesinde, grubunda ve ekibinde de yönetici.',
   'This group has no teams yet. Teams are smaller groups inside it, each with their own chat, tasks and questions.':
