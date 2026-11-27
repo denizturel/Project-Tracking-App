@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { locale } from '@/lib/i18n';
+import { useLiveVersion } from '@/lib/live';
 
 type Result<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
@@ -27,6 +28,7 @@ export function useRows<T>(key: string, load: () => Result<T>) {
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const live = useLiveVersion();
 
   useEffect(() => {
     let active = true;
@@ -43,7 +45,7 @@ export function useRows<T>(key: string, load: () => Result<T>) {
     };
     // `load` is rebuilt on every render; `key` and `version` decide when to run it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, version]);
+  }, [key, version, live]);
 
   const rows = loaded?.memory === memory ? loaded.rows : ((remembered.get(memory) as T[] | undefined) ?? loaded?.rows ?? null);
   return { rows: rows ?? [], loading: rows === null && error === null, error, reload };

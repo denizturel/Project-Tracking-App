@@ -1,6 +1,9 @@
 import { createContext, type ReactNode, use, useCallback, useEffect, useMemo, useState } from 'react';
 
+import { AppState } from 'react-native';
+
 import { useAuth } from '@/lib/auth';
+import { somethingChanged, useLiveVersion } from '@/lib/live';
 import { type Company, type CompanyRole, type Project, type Subgroup, supabase } from '@/lib/supabase';
 
 export type CompanyNode = Company & { role: CompanyRole };
@@ -97,6 +100,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const live = useLiveVersion();
+
+  // Someone added, moved or removed a person, or made or renamed a project, group or team:
+  // the database tells every open app, and the menu and lists load again by themselves.
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase.channel(`workspace-${userId}`);
+    for (const table of ['company_members', 'project_members', 'subgroup_members', 'projects', 'subgroups']) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, somethingChanged);
+    }
+    channel.subscribe();
+    // Coming back to the app (or to its browser tab) also brings everything up to date.
+    let away = 0;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') away = away || Date.now();
+      else if (away && Date.now() - away > 5000) somethingChanged();
+      if (state === 'active') away = 0;
+    });
+    return () => {
+      sub.remove();
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -109,7 +135,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [userId, version]);
+  }, [userId, version, live]);
 
   const value = useMemo(
     () => ({ ...(tree ?? empty), loading: tree === null && error === null, error, reload }),

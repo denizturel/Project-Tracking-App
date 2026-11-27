@@ -10,6 +10,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
+import { useLiveVersion } from '@/lib/live';
 import { appLink, shareLink } from '@/lib/join-link';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
@@ -97,6 +98,7 @@ export function People({ info }: { info: SpaceInfo }) {
   const [adding, setAdding] = useState(false);
   const [inviting, setInviting] = useState(false);
   const refresh = () => setVersion((v) => v + 1);
+  const live = useLiveVersion();
 
   useEffect(() => {
     let active = true;
@@ -107,7 +109,7 @@ export function People({ info }: { info: SpaceInfo }) {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [info.project.id, info.isAdmin, idsKey, version]);
+  }, [info.project.id, info.isAdmin, idsKey, version, live]);
 
   /** Runs the steps one after another and stops at the first that fails. */
   const run = async (...steps: (() => PromiseLike<Result>)[]) => {
@@ -138,7 +140,6 @@ export function People({ info }: { info: SpaceInfo }) {
     projectRole.get(userId) === 'admin' ? 'admin' : managedBy(userId).length ? 'manager' : 'member';
 
   const open = people.find((p) => p.user_id === openId) ?? null;
-  const notHere = subgroup ? data.project.filter((p) => !placedOf(p.user_id).some((h) => h.subgroup_id === subgroup.id)) : [];
 
   const setProjectRole = (userId: string, role: 'admin' | 'member') => () =>
     supabase.from('project_members').update({ role }).eq('project_id', project.id).eq('user_id', userId);
@@ -173,25 +174,12 @@ export function People({ info }: { info: SpaceInfo }) {
         )}
         {adding && subgroup && (
           <View style={[styles.addBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            {notHere.length === 0 && (
-              <ThemedText type="small" themeColor="textSecondary">
-                Everyone in the project is already here. Admins invite new people on the project&apos;s People page.
-              </ThemedText>
-            )}
-            {notHere.map((person) => (
-              <View key={person.user_id} style={styles.person}>
-                <Avatar name={person.profile?.full_name} size={30} />
-                <ThemedText style={styles.grow} numberOfLines={1}>
-                  {person.profile?.full_name ?? 'Unknown'}
-                </ThemedText>
-                <Button
-                  title="Add"
-                  small
-                  variant="secondary"
-                  onPress={() => run(() => supabase.from('subgroup_members').insert({ subgroup_id: subgroup.id, user_id: person.user_id }))}
-                />
-              </View>
-            ))}
+            <AddToPlace
+              companyId={project.company_id}
+              here={data.placed.filter((p) => p.subgroup_id === subgroup.id).map((p) => p.user_id)}
+              inProject={data.project.map((p) => p.user_id)}
+              onAdd={(userId) => run(() => supabase.rpc('add_to_place', { place: subgroup.id, person: userId }))}
+            />
           </View>
         )}
 
@@ -302,7 +290,7 @@ export function People({ info }: { info: SpaceInfo }) {
             .map((item) => ({
               id: item.id,
               name: item.parent_id ? `${nameOf(item.parent_id)} · ${item.name}` : item.name,
-              onAdd: () => run(() => supabase.from('subgroup_members').insert({ subgroup_id: item.id, user_id: open.user_id })),
+              onAdd: () => run(() => supabase.rpc('add_to_place', { place: item.id, person: open.user_id })),
             }))}
         />
       )}
@@ -513,6 +501,48 @@ const styles = StyleSheet.create({
 });
 
 type Colleague = { user_id: string; profile: { full_name: string; position: string | null } | null };
+
+/**
+ * Everyone in the company who is not in this group or team yet, added with one press.
+ * A person who was not in the project joins it as staff at the same time.
+ */
+function AddToPlace(props: { companyId: string; here: string[]; inProject: string[]; onAdd: (userId: string) => void }) {
+  const { rows, error, loading } = useRows<Colleague>(props.companyId, () =>
+    supabase
+      .from('company_members')
+      .select('user_id, profile:profiles!user_id(full_name, position)')
+      .eq('company_id', props.companyId)
+      .returns<Colleague[]>(),
+  );
+  const waiting = rows
+    .filter((person) => !props.here.includes(person.user_id))
+    .sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
+
+  return (
+    <>
+      <ErrorText>{error}</ErrorText>
+      {!loading && waiting.length === 0 && (
+        <ThemedText type="small" themeColor="textSecondary">
+          Everyone in the company is already here. New people are added on the company&apos;s page.
+        </ThemedText>
+      )}
+      {waiting.map((person) => (
+        <View key={person.user_id} style={styles.person}>
+          <Avatar name={person.profile?.full_name} size={30} />
+          <View style={styles.grow}>
+            <ThemedText raw numberOfLines={1}>
+              {person.profile?.full_name ?? ''}
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              {props.inProject.includes(person.user_id) ? 'In this project' : 'In the company, joins this project too'}
+            </ThemedText>
+          </View>
+          <Button title="Add" small variant="secondary" onPress={() => props.onAdd(person.user_id)} />
+        </View>
+      ))}
+    </>
+  );
+}
 
 /** People who are already in the company space are added with one press, no code needed. */
 function AddFromCompany(props: { info: SpaceInfo; inProject: string[]; onAdd: (userId: string) => void }) {
