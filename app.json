@@ -39,6 +39,20 @@
         {
           "faceIDPermission": "Allow Doneva to use Face ID to unlock the app."
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Doneva to use the microphone to record voice messages."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Doneva to open your photos so you can send them in chats.",
+          "cameraPermission": false,
+          "microphonePermission": "Allow Doneva to use the microphone to record voice messages."
+        }
       ]
     ],
     "experiments": {

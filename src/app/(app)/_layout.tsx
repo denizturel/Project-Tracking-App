@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OverlayHost } from '@/components/overlay';
 import { MenuClose, MiniRail, Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui';
@@ -106,6 +107,7 @@ export default function AppLayout() {
           <Pressable accessibilityLabel="Close menu" style={styles.backdrop} onPress={() => setOpen(false)} />
         </View>
       )}
+      <OverlayHost />
       </UnseenProvider>
       </NotificationsProvider>
     </WorkspaceProvider>

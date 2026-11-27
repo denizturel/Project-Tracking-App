@@ -1,5 +1,8 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { Linking } from 'react-native';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
+import { Linking, Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 
@@ -59,12 +62,65 @@ export async function pickFile(): Promise<Outgoing | { problem: string } | null>
   };
 }
 
+/** Lets the person choose one picture from the phone's photos. */
+export async function pickPhoto(): Promise<Outgoing | { problem: string } | null> {
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+  if (result.canceled) return null;
+  const asset = result.assets[0];
+  if ((asset.fileSize ?? 0) > MAX_FILE) return { problem: 'That file is larger than 50 MB.' };
+  return {
+    name: asset.fileName ?? 'photo.jpg',
+    mimeType: asset.mimeType ?? 'image/jpeg',
+    size: asset.fileSize ?? 0,
+    body: asset.file ?? { uri: asset.uri },
+  };
+}
+
+/** The longest side of a stored picture, in dots. Enough to read a photographed page or a screenshot. */
+const PICTURE_SIDE = 1600;
+/** Small pictures (icons, short screenshots) are kept as they are. */
+const SMALL_PICTURE = 300 * 1024;
+
+/**
+ * Pictures are made smaller before they are stored, the way chat apps do: at most 1600 dots on the long side,
+ * saved as JPEG. A photo from a phone camera goes from several MB to a few hundred KB.
+ * Anything that would not get smaller, and every other kind of file, is stored exactly as it is.
+ */
+export async function shrink(file: Outgoing): Promise<Outgoing> {
+  if (file.voiceSeconds !== undefined || !/^image\/(jpe?g|png|heic|heif|webp)$/i.test(file.mimeType)) return file;
+  if (file.size > 0 && file.size < SMALL_PICTURE) return file;
+  const made = 'uri' in file.body ? null : URL.createObjectURL(file.body);
+  try {
+    const source = 'uri' in file.body ? file.body.uri : (made as string);
+    const work = ImageManipulator.manipulate(source);
+    const first = await work.renderAsync();
+    if (Math.max(first.width, first.height) > PICTURE_SIDE) {
+      work.resize(first.width >= first.height ? { width: PICTURE_SIDE } : { height: PICTURE_SIDE });
+    }
+    const saved = await (await work.renderAsync()).saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+    const blob = await (await fetch(saved.uri)).blob();
+    if (!blob.size || (file.size > 0 && blob.size >= file.size)) return file;
+    return {
+      name: `${file.name.replace(/\.[^.]+$/, '')}.jpg`,
+      mimeType: 'image/jpeg',
+      size: blob.size,
+      body: Platform.OS === 'web' ? blob : { uri: saved.uri },
+    };
+  } catch {
+    return file;
+  } finally {
+    if (made) URL.revokeObjectURL(made);
+  }
+}
+
 /** Stores the file and ties it to the message. Gives the reason when it fails. */
-export async function saveAttachment(conversationId: string, messageId: string, file: Outgoing): Promise<string | null> {
+export async function saveAttachment(conversationId: string, messageId: string, picked: Outgoing): Promise<string | null> {
+  const file = await shrink(picked);
   const safeName = file.name.replace(/[^\w.-]+/g, '_').slice(-80);
   // The second folder is the chat's id: the storage rules let only people of that chat read or add.
   const path = `chat/${conversationId}/${Date.now()}-${safeName}`;
   const body = 'uri' in file.body ? await (await fetch(file.body.uri)).arrayBuffer() : file.body;
+  const size = file.size || ('byteLength' in body ? body.byteLength : body.size);
   const uploaded = await supabase.storage.from('attachments').upload(path, body, { contentType: file.mimeType });
   if (uploaded.error) return uploaded.error.message;
   const kind = file.voiceSeconds !== undefined ? 'voice' : file.mimeType.startsWith('image/') ? 'image' : 'file';
@@ -75,7 +131,7 @@ export async function saveAttachment(conversationId: string, messageId: string, 
     storage_path: path,
     file_name: file.name,
     mime_type: file.mimeType,
-    size_bytes: file.size || null,
+    size_bytes: size || null,
     duration_seconds: file.voiceSeconds === undefined ? null : Math.min(MAX_VOICE, Math.max(1, Math.round(file.voiceSeconds))),
   });
   return error?.message ?? null;
@@ -93,14 +149,23 @@ export async function fileUrl(path: string): Promise<string | null> {
   return data.signedUrl;
 }
 
-/** Opens the file in the browser or the phone's own viewer. Gives the reason when it cannot. */
-export async function openAttachment(item: Attachment): Promise<string | null> {
-  const url = item.url ?? (item.storage_path ? await fileUrl(item.storage_path) : null);
-  if (!url) return 'This file could not be opened.';
-  return Linking.openURL(url).then(
+/**
+ * Opens a web address without leaving the app: the phone apps show it in a sheet over the app
+ * (PDFs and Office files are shown there too), the website opens a new tab.
+ */
+export async function openInApp(url: string): Promise<string | null> {
+  const opening = Platform.OS === 'web' ? Linking.openURL(url) : WebBrowser.openBrowserAsync(url);
+  return opening.then(
     () => null,
     () => 'This file could not be opened.',
   );
+}
+
+/** Opens a stored file or a link. Gives the reason when it cannot. */
+export async function openAttachment(item: Attachment): Promise<string | null> {
+  const url = item.url ?? (item.storage_path ? await fileUrl(item.storage_path) : null);
+  if (!url) return 'This file could not be opened.';
+  return openInApp(url);
 }
 
 /** Web addresses written in a message, for the Links list. */

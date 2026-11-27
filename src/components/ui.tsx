@@ -3,7 +3,6 @@ import { type ComponentProps, type ComponentRef, type ReactNode, useRef, useStat
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Overlay } from '@/components/overlay';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Radius, Spacing, type ThemeColor, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -382,9 +382,10 @@ export function MoreMenu({ actions, label = 'More actions' }: { actions: (MenuAc
   return (
     <View ref={anchor} collapsable={false}>
       <IconButton icon="more-vertical" label={label} onPress={open} />
-      <Modal visible={!!at} transparent animationType="none" statusBarTranslucent onRequestClose={close}>
+      {at && (
+      <Overlay onClose={close}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
-        {at && (
+        {(
           <View
             style={[
               styles.more,
@@ -412,7 +413,8 @@ export function MoreMenu({ actions, label = 'More actions' }: { actions: (MenuAc
             ))}
           </View>
         )}
-      </Modal>
+      </Overlay>
+      )}
     </View>
   );
 }

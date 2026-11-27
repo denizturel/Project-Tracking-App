@@ -1,5 +1,4 @@
 import * as DocumentPicker from 'expo-document-picker';
-import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -9,6 +8,7 @@ import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, EditedLabel, ErrorText, Field, TextButton, MoreMenu } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { openInApp } from '@/lib/attachments';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { useWorkspace } from '@/lib/workspace';
@@ -252,7 +252,7 @@ function ItemCard({ copies, places, here, showPlaces, isAdmin, onChanged }: Card
   async function open() {
     setError(null);
     if (item.kind === 'link' && item.url) {
-      await Linking.openURL(item.url).catch(() => setError('This link could not be opened.'));
+      if (await openInApp(item.url)) setError('This link could not be opened.');
       return;
     }
     if (!item.storage_path) return;
@@ -260,7 +260,7 @@ function ItemCard({ copies, places, here, showPlaces, isAdmin, onChanged }: Card
     const { data, error: failed } = await supabase.storage.from('attachments').createSignedUrl(item.storage_path, 3600);
     setBusy(false);
     if (failed || !data) return setError(failed?.message ?? 'This file could not be opened.');
-    await Linking.openURL(data.signedUrl).catch(() => setError('This file could not be opened.'));
+    setError(await openInApp(data.signedUrl));
   }
 
   async function run(action: PromiseLike<{ error: { message: string } | null }>) {

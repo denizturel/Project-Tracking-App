@@ -4,11 +4,14 @@ import { Platform } from 'react-native';
 import { MAX_VOICE, type Outgoing } from '@/lib/attachments';
 
 /**
- * Voice messages are recorded with the browser's own recorder, so for now recording works on the website
- * (computer and phone browsers). The phone apps play voice messages and will record once the audio part is added to their builds.
+ * The website records voice messages with the browser's own recorder (computer and phone browsers).
+ * The phone apps use voice.native.ts. Both record small files: speech quality, about 0.25 MB a minute.
  */
 export const canRecordVoice =
   Platform.OS === 'web' && typeof navigator !== 'undefined' && !!navigator.mediaDevices && typeof MediaRecorder !== 'undefined';
+
+/** Enough for clear speech. Music quality would be four times larger. */
+const VOICE_BITS = 32000;
 
 /** The sound format every browser and phone can play back, when this browser can record it. */
 function bestFormat() {
@@ -53,7 +56,7 @@ export function useVoiceRecorder(onLimit: () => void) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const format = bestFormat();
-      const made = new MediaRecorder(stream, format ? { mimeType: format } : undefined);
+      const made = new MediaRecorder(stream, { ...(format ? { mimeType: format } : {}), audioBitsPerSecond: VOICE_BITS });
       parts.current = [];
       made.ondataavailable = (event) => {
         if (event.data.size > 0) parts.current.push(event.data);

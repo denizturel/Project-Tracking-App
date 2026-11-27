@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, Share, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, Switch, View } from 'react-native';
 
 import { PersonActions } from '@/components/person-actions';
 import { QrCode } from '@/components/qr-code';
 import { type SpaceInfo } from '@/components/space/space';
+import { Overlay } from '@/components/overlay';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, IconButton, SearchField, TextButton } from '@/components/ui';
 import { fits } from '@/lib/suggest';
@@ -336,7 +337,7 @@ function ProfileCard(props: ProfileCardProps) {
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Overlay onClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable accessibilityLabel="Close card" style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -460,7 +461,7 @@ function ProfileCard(props: ProfileCardProps) {
           </View>
         </View>
       </View>
-    </Modal>
+    </Overlay>
   );
 }
 

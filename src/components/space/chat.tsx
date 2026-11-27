@@ -15,7 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, EditedLabel, ErrorText, Icon, IconButton, TextButton, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { type Attachment, ATTACHMENT_COLUMNS, clock, type Outgoing, pickFile, saveAttachment, sizeText } from '@/lib/attachments';
+import { type Attachment, ATTACHMENT_COLUMNS, clock, type Outgoing, pickFile, pickPhoto, saveAttachment, sizeText } from '@/lib/attachments';
 import { fold } from '@/lib/fold';
 import { locale, tr } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
@@ -216,9 +216,9 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
     refresh();
   }
 
-  async function attach() {
+  async function attach(photo = false) {
     setError(null);
-    const picked = await pickFile();
+    const picked = await (photo ? pickPhoto() : pickFile());
     if (!picked) return;
     if ('problem' in picked) return setError(picked.problem);
     setFile(picked);
@@ -418,7 +418,9 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
           )}
           {!closed && !voice.recording && (
           <View style={styles.inputRow}>
-            {!editing && <IconButton icon="paperclip" label="Attach a file" onPress={attach} color="primary" disabled={busy} />}
+            {!editing && <IconButton icon="paperclip" label="Attach a file" onPress={() => attach()} color="primary" disabled={busy} />}
+            {/* The phone apps reach the photos with their own button; on the website the file chooser shows pictures too. */}
+            {!editing && Platform.OS !== 'web' && <IconButton icon="image" label="Send a photo" onPress={() => attach(true)} color="primary" disabled={busy} />}
             <TextInput
               accessibilityLabel="Message"
               placeholder={tr('Write a message')}
