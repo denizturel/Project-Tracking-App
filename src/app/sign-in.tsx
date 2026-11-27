@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -21,6 +22,7 @@ const GOOGLE_SIGN_IN: boolean = false;
 export default function SignInScreen() {
   const { lang } = usePrefs();
   const { signInWithGoogle } = useAuth();
+  const router = useRouter();
   // 'confirm': typing the code from the confirmation email. 'forgot' and 'reset': a new password with an emailed code.
   const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'confirm' | 'forgot' | 'reset'>('sign-in');
   const [code, setCode] = useState('');
@@ -343,6 +345,11 @@ export default function SignInScreen() {
               : 'Fields with * are required.'}
           </ThemedText>
         )}
+        {creating && (
+          <ThemedText type="small" themeColor="textSecondary">
+            By creating an account you accept the terms of use and the privacy policy below.
+          </ThemedText>
+        )}
 
         <ErrorText>{error}</ErrorText>
         {notice && <ThemedText type="small">{notice}</ThemedText>}
@@ -376,6 +383,11 @@ export default function SignInScreen() {
         )}
       </Card>
       )}
+
+      <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: Spacing.three }}>
+        <Button title="Privacy policy" variant="plain" small onPress={() => router.push('/privacy')} />
+        <Button title="Terms of use" variant="plain" small onPress={() => router.push('/terms')} />
+      </View>
     </Screen>
   );
 }

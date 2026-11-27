@@ -12,12 +12,18 @@ export function tokenFrom(text: string): string | null {
 /** The link that opens the app on a phone. This is what the QR code holds. */
 export const appLink = (token: string) => `projecttrackingapp://join/${token}`;
 
-/** The link to share: the website's address in a browser, the app link on phones. */
-export const shareLink = (token: string) =>
-  // A link to this computer (localhost) is of no use to anyone else.
-  Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? `${window.location.origin}/join/${token}`
-    : appLink(token);
+const WEBSITE = (process.env.EXPO_PUBLIC_WEB_URL ?? '').replace(/\/+$/, '');
+
+/**
+ * The link to share and to put in the QR code: the join page of the website,
+ * which works in any browser, with or without the app installed.
+ */
+export function shareLink(token: string) {
+  // On the website itself, its own address is used (a link to this computer, localhost, is of no use to anyone else).
+  const here = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? window.location.origin : '';
+  const site = here || WEBSITE;
+  return site ? `${site}/join/${token}` : appLink(token);
+}
 
 /** Remembers a link that was opened before signing in, so Home can finish joining afterwards. */
 export const savePendingJoin = (token: string) => AsyncStorage.setItem(KEY, token).catch(() => {});

@@ -11,7 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { jobText } from '@/lib/i18n';
 import { useLiveVersion } from '@/lib/live';
-import { appLink, shareLink } from '@/lib/join-link';
+import { shareLink } from '@/lib/join-link';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type SubgroupNode, useWorkspace } from '@/lib/workspace';
@@ -645,9 +645,9 @@ function InviteLink({ info }: { info: SpaceInfo }) {
       <ErrorText>{failed ?? error}</ErrorText>
       {on && link && (
         <>
-          <QrCode value={appLink(link.token)} />
+          <QrCode value={shareLink(link.token)} />
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
-            Scan with the phone&apos;s camera. The Doneva app must be on the phone.
+            Scan with the phone&apos;s camera. It opens Doneva in the browser.
           </ThemedText>
           <ThemedText type="small" raw selectable style={{ textAlign: 'center' }}>
             {shareLink(link.token)}

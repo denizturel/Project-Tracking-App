@@ -111,6 +111,9 @@ function Screens({
       <Stack.Protected guard={ready}>
         <Stack.Screen name="(app)" options={{ headerShown: false }} />
       </Stack.Protected>
+      {/* Open to everyone, signed in or not. */}
+      <Stack.Screen name="privacy" options={{ headerShown: false }} />
+      <Stack.Screen name="terms" options={{ headerShown: false }} />
     </Stack>
   );
 }
