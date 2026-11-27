@@ -9,16 +9,19 @@ import {
   View,
 } from 'react-native';
 
+import { AttachmentView } from '@/components/space/attachment-view';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, EditedLabel, ErrorText, IconButton, TextButton, MoreMenu } from '@/components/ui';
+import { Avatar, Button, EditedLabel, ErrorText, Icon, IconButton, TextButton, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { type Attachment, ATTACHMENT_COLUMNS, clock, type Outgoing, pickFile, saveAttachment, sizeText } from '@/lib/attachments';
 import { fold } from '@/lib/fold';
 import { locale, tr } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { markSeen } from '@/lib/unseen';
+import { canRecordVoice, useVoiceRecorder } from '@/lib/voice';
 import { keptChats } from '@/lib/use-rows';
 
 type Message = {
@@ -30,6 +33,7 @@ type Message = {
   deleted_at: string | null;
   sender: { full_name: string } | null;
   editor: { full_name: string } | null;
+  attachments: Attachment[] | null;
 };
 
 type Loaded = { conversationId: string | null; messages: Message[]; error: string | null; loadedAt: number };
@@ -60,7 +64,7 @@ async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined
   const messages = await supabase
     .from('messages')
     .select(
-      'id, sender_id, body, created_at, edited_at, deleted_at, sender:profiles!sender_id(full_name), editor:profiles!edited_by(full_name)',
+      `id, sender_id, body, created_at, edited_at, deleted_at, sender:profiles!sender_id(full_name), editor:profiles!edited_by(full_name), attachments(${ATTACHMENT_COLUMNS})`,
     )
     .eq('conversation_id', found.data.id)
     .order('created_at', { ascending: false })
@@ -158,30 +162,77 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
         { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` },
         () => setVersion((v) => v + 1),
       )
+      // A file or voice message is stored a moment after its message, so it gets its own signal.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'attachments', filter: `conversation_id=eq.${conversationId}` },
+        () => setVersion((v) => v + 1),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [conversationId]);
 
-  async function send() {
+  // A file that was picked and waits for Send, and the voice recorder.
+  const [file, setFile] = useState<Outgoing | null>(null);
+  // A voice message stops by itself at the longest length and is sent.
+  const voice = useVoiceRecorder(() => void endRecording(true));
+
+  /** Sends the text, with a file or voice message when there is one. */
+  async function send(extra?: Outgoing) {
     const body = text.trim();
-    if (!body || !conversationId) return;
+    const attached = extra ?? file;
+    if ((!body && !attached) || !conversationId) return;
     setBusy(true);
     setError(null);
-    const { error: failed } = editing
-      ? await supabase.from('messages').update({ body }).eq('id', editing.id)
-      : await supabase.from('messages').insert({ conversation_id: conversationId, body });
+    let failed: string | null = null;
+    if (editing) {
+      failed = (await supabase.from('messages').update({ body }).eq('id', editing.id)).error?.message ?? null;
+    } else if (attached) {
+      // The message comes first, because a file belongs to a message. A voice message goes without the typed text.
+      const made = await supabase
+        .from('messages')
+        .insert({ conversation_id: conversationId, body: extra ? null : body || null })
+        .select('id')
+        .single();
+      failed = made.error?.message ?? (await saveAttachment(conversationId, (made.data as { id: string }).id, attached));
+      // A message whose file did not arrive is taken back, so no empty bubble is left.
+      if (failed && made.data) await supabase.rpc('delete_message', { message_id: (made.data as { id: string }).id });
+    } else {
+      failed = (await supabase.from('messages').insert({ conversation_id: conversationId, body })).error?.message ?? null;
+    }
     setBusy(false);
     if (failed) {
       // A private chat stops taking messages when one side blocked the other or they no longer share anything.
-      setError(direct && failed.message.includes('row-level security') ? 'This message could not be sent.' : failed.message);
+      setError(direct && failed.includes('row-level security') ? 'This message could not be sent.' : failed);
       return;
     }
-    setText('');
+    if (!extra) {
+      setText('');
+      setFile(null);
+    }
     setEditing(null);
     refresh();
   }
+
+  async function attach() {
+    setError(null);
+    const picked = await pickFile();
+    if (!picked) return;
+    if ('problem' in picked) return setError(picked.problem);
+    setFile(picked);
+  }
+
+  async function record() {
+    setError(await voice.start());
+  }
+
+  async function endRecording(keep: boolean) {
+    const recorded = await voice.stop(keep);
+    if (recorded) await send(recorded);
+  }
+
 
   async function remove(message: Message) {
     const { error: failed } = await supabase.rpc('delete_message', { message_id: message.id });
@@ -285,15 +336,19 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
                     {item.sender?.full_name ?? 'Someone'}
                   </ThemedText>
                 )}
-                <ThemedText raw={!deleted} themeColor={deleted ? 'textSecondary' : 'text'} style={deleted && styles.deleted}>
-                  {deleted ? 'This message was deleted' : item.body}
-                </ThemedText>
+                {!deleted && (item.attachments ?? []).map((attachment) => <AttachmentView key={attachment.id} item={attachment} />)}
+                {(deleted || !!item.body) && (
+                  <ThemedText raw={!deleted} themeColor={deleted ? 'textSecondary' : 'text'} style={deleted && styles.deleted}>
+                    {deleted ? 'This message was deleted' : item.body}
+                  </ThemedText>
+                )}
                 {!deleted && <EditedLabel name={item.editor?.full_name ?? null} at={item.edited_at} />}
                 <View style={styles.meta}>
                   {!deleted && ((mine && open) || info?.isAdmin) && (
                     <MoreMenu
                       actions={[
-                        {
+                        // A voice message or a file without words has no text to edit.
+                        !!item.body && {
                           title: 'Edit',
                           onPress: () => {
                             setEditing(item);
@@ -336,8 +391,34 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
               />
             </View>
           )}
-          {!closed && (
+          {file && !voice.recording && (
+            <View style={[styles.waiting, { borderColor: theme.border, backgroundColor: theme.background }]}>
+              <Icon name="paperclip" size={18} color="primary" />
+              <ThemedText type="small" raw numberOfLines={1} style={styles.flex}>
+                {file.name}
+                {file.size ? ` · ${sizeText(file.size)}` : ''}
+              </ThemedText>
+              <IconButton icon="x" label="Remove the file" onPress={() => setFile(null)} />
+            </View>
+          )}
+          {!closed && voice.recording && (
+            <View style={styles.inputRow}>
+              <View style={[styles.recording, { borderColor: theme.danger }]}>
+                <Icon name="mic" size={20} color="danger" />
+                <ThemedText type="bold" raw>
+                  {clock(voice.seconds)}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.flex}>
+                  Recording a voice message
+                </ThemedText>
+              </View>
+              <IconButton icon="trash-2" label="Throw the recording away" onPress={() => endRecording(false)} color="danger" />
+              <Button title="Send" icon="send" onPress={() => endRecording(true)} loading={busy} />
+            </View>
+          )}
+          {!closed && !voice.recording && (
           <View style={styles.inputRow}>
+            {!editing && <IconButton icon="paperclip" label="Attach a file" onPress={attach} color="primary" disabled={busy} />}
             <TextInput
               accessibilityLabel="Message"
               placeholder={tr('Write a message')}
@@ -345,17 +426,21 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
               value={text}
               onChangeText={setText}
               multiline
-              onSubmitEditing={send}
+              onSubmitEditing={() => send()}
               submitBehavior="submit"
               style={[styles.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
             />
-            <Button
-              title={editing ? 'Save' : 'Send'}
-              icon={editing ? 'check' : 'send'}
-              onPress={send}
-              loading={busy}
-              disabled={!text.trim()}
-            />
+            {canRecordVoice && !editing && !text.trim() && !file ? (
+              <Button title="Voice" icon="mic" variant="secondary" onPress={record} loading={busy} />
+            ) : (
+              <Button
+                title={editing ? 'Save' : 'Send'}
+                icon={editing ? 'check' : 'send'}
+                onPress={() => send()}
+                loading={busy}
+                disabled={!text.trim() && !file}
+              />
+            )}
           </View>
           )}
         </View>
@@ -394,7 +479,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   composer: { borderTopWidth: 1, padding: Spacing.three, alignItems: 'center' },
   composerColumn: { width: '100%', maxWidth: MaxContentWidth + 160, gap: Spacing.one },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.two },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  waiting: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingLeft: 12, paddingRight: 2 },
+  recording: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 24, paddingHorizontal: 14, minHeight: 48 },
   input: {
     flex: 1,
     minHeight: 48,

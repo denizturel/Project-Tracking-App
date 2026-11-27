@@ -2,6 +2,7 @@ import { type ComponentRef, useEffect, useRef } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { Media } from '@/components/space/media';
 import { Chat } from '@/components/space/chat';
 import { Overview, Places } from '@/components/space/overview';
 import { People } from '@/components/space/people';
@@ -12,7 +13,7 @@ import { Tasks } from '@/components/space/tasks';
 import { Training } from '@/components/space/training';
 import { Link } from '@/components/go';
 import { ThemedText } from '@/components/themed-text';
-import { Button, ComingNext, ErrorText, Icon, type IconName, Pill, type Tone, MoreMenu } from '@/components/ui';
+import { Button, ErrorText, Icon, type IconName, Pill, type Tone, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -279,7 +280,7 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
             {inner === 'Schedule' && <Schedule info={info} />}
             {inner === 'Questions & solutions' && <Questions info={info} />}
             {inner === 'Training' && <Training info={info} />}
-            {inner === 'Media, links, docs' && <ComingNext what={inner} />}
+            {inner === 'Media, links, docs' && <Media info={info} />}
           </View>
         </ScrollView>
       )}

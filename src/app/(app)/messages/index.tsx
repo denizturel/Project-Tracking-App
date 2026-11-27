@@ -79,8 +79,8 @@ export default function MessagesScreen() {
                           {chat.last_body}
                         </ThemedText>
                       ) : (
-                        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                          No messages yet
+                        <ThemedText type={chat.unread ? 'smallBold' : 'small'} themeColor={chat.unread ? 'text' : 'textSecondary'} numberOfLines={1}>
+                          {chat.last_at ? 'File or voice message' : 'No messages yet'}
                         </ThemedText>
                       )}
                     </View>
