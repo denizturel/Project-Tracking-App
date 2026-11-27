@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { NewProject } from '@/components/new-project';
@@ -120,6 +120,7 @@ function CompanyPage({ company }: { company: CompanyNode }) {
         <ErrorText>{failed ?? error}</ErrorText>
       </Card>
 
+      {admin && <Waiting company={company} onAdded={reload} />}
       {admin && <AddPerson company={company} people={people} onAdded={reload} />}
 
       <Card>
@@ -186,6 +187,58 @@ function CompanyPage({ company }: { company: CompanyNode }) {
         ))}
       </Card>
     </ScrollView>
+  );
+}
+
+type Candidate = { user_id: string; username: string | null; full_name: string; position: string | null };
+
+/**
+ * People who wrote this company's name when they signed up and are not in it yet.
+ * Nobody joins by typing a name: the owner or a company admin presses Add.
+ */
+function Waiting({ company, onAdded }: { company: CompanyNode; onAdded: () => void }) {
+  const { rows, reload } = useRows<Candidate>(company.id, () =>
+    supabase.rpc('company_candidates', { company: company.id }) as unknown as PromiseLike<{ data: Candidate[] | null; error: { message: string } | null }>,
+  );
+  const [failed, setFailed] = useState<string | null>(null);
+
+  // A new account shows up here by itself while the page is open.
+  useEffect(() => {
+    const timer = setInterval(reload, 15000);
+    return () => clearInterval(timer);
+  }, [reload]);
+
+  async function add(person: Candidate, role: 'member' | 'guest') {
+    const result = await supabase.from('company_members').insert({ company_id: company.id, user_id: person.user_id, role });
+    setFailed(result.error?.message ?? null);
+    reload();
+    if (!result.error) onAdded();
+  }
+
+  if (rows.length === 0) return null;
+  return (
+    <Card tint="butter">
+      <ThemedText type="subtitle">New people who wrote this company</ThemedText>
+      <ThemedText themeColor="textSecondary">
+        They wrote this company&apos;s name when they signed up. Add only the people you know.
+      </ThemedText>
+      <ErrorText>{failed}</ErrorText>
+      {rows.map((person) => (
+        <View key={person.user_id} style={styles.line}>
+          <Avatar name={person.full_name} size={40} />
+          <View style={styles.grow}>
+            <ThemedText type="bold" raw numberOfLines={1}>
+              {person.full_name}
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1}>
+              {[person.username ? `@${person.username}` : null, person.position].filter(Boolean).join(' · ')}
+            </ThemedText>
+          </View>
+          <Button title="Add as staff" small variant="secondary" onPress={() => add(person, 'member')} />
+          <MoreMenu actions={[{ title: 'Add as guest', onPress: () => add(person, 'guest') }]} />
+        </View>
+      ))}
+    </Card>
   );
 }
 
