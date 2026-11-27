@@ -279,7 +279,8 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
                     : { backgroundColor: theme.card, borderColor: theme.border },
                   item.id === target && { borderColor: theme.primary, borderWidth: 3 },
                 ]}>
-                {!mine && (
+                {/* In a private chat there is only one other person, so their name is not repeated. */}
+                {!mine && !direct && (
                   <ThemedText type="smallBold" themeColor="primary">
                     {item.sender?.full_name ?? 'Someone'}
                   </ThemedText>

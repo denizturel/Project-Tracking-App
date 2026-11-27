@@ -109,6 +109,7 @@ function Screens({
       <Stack.Screen name="terms" options={{ headerShown: false }} />
       <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack.Screen name="sign-up" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Protected guard={signedIn && !ready} redirectTo={signedIn ? '/' : '/sign-in'}>
         <Stack.Screen name="work-details" options={{ headerShown: false }} />

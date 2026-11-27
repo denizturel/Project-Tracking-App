@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -30,7 +30,9 @@ export default function SignInScreen() {
   const { signInWithGoogle } = useAuth();
   const router = useRouter();
   // 'confirm': typing the code from the confirmation email. 'forgot' and 'reset': a new password with an emailed code.
-  const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'confirm' | 'forgot' | 'reset'>('sign-in');
+  // donevaapp.com/sign-up opens this page with the new-account form already showing.
+  const { new: startNew } = useLocalSearchParams<{ new?: string }>();
+  const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'confirm' | 'forgot' | 'reset'>(startNew ? 'sign-up' : 'sign-in');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
