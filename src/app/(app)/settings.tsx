@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const [security, setSecurity] = useState(false);
   const prefs = usePrefs();
+  const router = useRouter();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
 
   return (
@@ -61,6 +63,13 @@ export default function SettingsScreen() {
           />
         </Card>
         {security && <Security />}
+
+        <Card>
+          <View style={styles.setting}>
+            <Button title="Privacy policy" variant="plain" onPress={() => router.push('/privacy')} />
+            <Button title="Terms of use" variant="plain" onPress={() => router.push('/terms')} />
+          </View>
+        </Card>
 
         <Card>
           <ThemedText type="small" themeColor="textSecondary">
