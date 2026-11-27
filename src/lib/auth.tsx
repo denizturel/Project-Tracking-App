@@ -48,11 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The same person again (a renewed sign-in, or coming back to the browser tab) must not redraw every page.
       const samePerson = !!next && shownUser.current === next.user.id;
       shownUser.current = next?.user.id ?? null;
-      if (!samePerson) {
-        forgetRows();
-        setSession(next);
-      }
+      if (!samePerson) forgetRows();
       if (!next) {
+        setSession(null);
         setProfile(null);
         setLoading(false);
         return;
@@ -60,7 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (samePerson) return;
       // Deferred: Supabase calls must not run inside this callback.
       setTimeout(async () => {
-        setProfile(await fetchProfile(next.user.id));
+        const loaded = await fetchProfile(next.user.id);
+        // Someone else signed in, or this person signed out, while the profile was loading.
+        if (shownUser.current !== next.user.id) return;
+        // The session and its profile arrive together. With the session first, the work-details
+        // form flashed for a moment after every sign-in, because the profile was not there yet.
+        setProfile(loaded);
+        setSession(next);
         setLoading(false);
       }, 0);
     });
