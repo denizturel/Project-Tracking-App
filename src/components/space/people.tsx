@@ -5,7 +5,8 @@ import { PersonActions } from '@/components/person-actions';
 import { QrCode } from '@/components/qr-code';
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, IconButton, TextButton } from '@/components/ui';
+import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, IconButton, SearchField, TextButton } from '@/components/ui';
+import { fits } from '@/lib/suggest';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -496,7 +497,41 @@ const styles = StyleSheet.create({
   addChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
 
-type Colleague = { user_id: string; profile: { full_name: string; position: string | null } | null };
+type Colleague = { user_id: string; profile: { full_name: string; position: string | null; username: string | null } | null };
+
+/** With many people only the first few show until a name is typed. */
+const SHOWN_AT_FIRST = 8;
+
+/** The box to type a name in, and the company people that fit what is typed so far. */
+function useNameFilter(people: Colleague[]) {
+  const [typed, setTyped] = useState('');
+  const fitting = people.filter((person) => fits(typed, person.profile?.full_name, person.profile?.position, person.profile?.username));
+  const shown = typed.trim() ? fitting.slice(0, 30) : fitting.slice(0, SHOWN_AT_FIRST);
+  return { typed, setTyped, fitting, shown, more: fitting.length - shown.length };
+}
+
+function NameFilter({ filter, total }: { filter: ReturnType<typeof useNameFilter>; total: number }) {
+  if (total === 0) return null;
+  return (
+    <>
+      <SearchField value={filter.typed} onChangeText={filter.setTyped} placeholder="Type a name" />
+      {!!filter.typed.trim() && filter.fitting.length === 0 && (
+        <ThemedText type="small" themeColor="textSecondary">
+          Nobody in the company fits this name.
+        </ThemedText>
+      )}
+    </>
+  );
+}
+
+function MoreHint({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <ThemedText type="small" themeColor="textSecondary">
+      More people fit. Type a name to find them.
+    </ThemedText>
+  );
+}
 
 /**
  * Everyone in the company who is not in this group or team yet, added with one press.
@@ -506,23 +541,25 @@ function AddToPlace(props: { companyId: string; here: string[]; inProject: strin
   const { rows, error, loading } = useRows<Colleague>(`people1:${props.companyId}`, () =>
     supabase
       .from('company_members')
-      .select('user_id, profile:profiles!user_id(full_name, position)')
+      .select('user_id, profile:profiles!user_id(full_name, position, username)')
       .eq('company_id', props.companyId)
       .returns<Colleague[]>(),
   );
   const waiting = rows
     .filter((person) => !props.here.includes(person.user_id))
     .sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
+  const filter = useNameFilter(waiting);
 
   return (
     <>
       <ErrorText>{error}</ErrorText>
+      <NameFilter filter={filter} total={waiting.length} />
       {!loading && waiting.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary">
           Everyone in the company is already here. New people are added on the company&apos;s page.
         </ThemedText>
       )}
-      {waiting.map((person) => (
+      {filter.shown.map((person) => (
         <View key={person.user_id} style={styles.person}>
           <Avatar name={person.profile?.full_name} size={30} />
           <View style={styles.grow}>
@@ -536,6 +573,7 @@ function AddToPlace(props: { companyId: string; here: string[]; inProject: strin
           <Button title="Add" small variant="secondary" onPress={() => props.onAdd(person.user_id)} />
         </View>
       ))}
+      <MoreHint count={filter.more} />
     </>
   );
 }
@@ -546,24 +584,26 @@ function AddFromCompany(props: { info: SpaceInfo; inProject: string[]; onAdd: (u
   const { rows, error } = useRows<Colleague>(`people2:${project.company_id}`, () =>
     supabase
       .from('company_members')
-      .select('user_id, profile:profiles!user_id(full_name, position)')
+      .select('user_id, profile:profiles!user_id(full_name, position, username)')
       .eq('company_id', project.company_id)
       .returns<Colleague[]>(),
   );
   const waiting = rows
     .filter((person) => !props.inProject.includes(person.user_id))
     .sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
+  const filter = useNameFilter(waiting);
 
   return (
     <Card tint="mint">
       <ThemedText type="bold">Add people from the company</ThemedText>
       <ErrorText>{error}</ErrorText>
+      <NameFilter filter={filter} total={waiting.length} />
       {waiting.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary">
           Everyone in the company space is already in this project.
         </ThemedText>
       )}
-      {waiting.map((person) => (
+      {filter.shown.map((person) => (
         <View key={person.user_id} style={styles.person}>
           <Avatar name={person.profile?.full_name} size={30} />
           <View style={styles.grow}>
@@ -579,6 +619,7 @@ function AddFromCompany(props: { info: SpaceInfo; inProject: string[]; onAdd: (u
           <Button title="Add" small variant="secondary" onPress={() => props.onAdd(person.user_id)} />
         </View>
       ))}
+      <MoreHint count={filter.more} />
     </Card>
   );
 }

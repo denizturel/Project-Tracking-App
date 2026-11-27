@@ -6,8 +6,10 @@ import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, ErrorText, Field, Icon } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { canMessage, startChat, useMyPeople } from '@/lib/direct';
 import { fold } from '@/lib/fold';
-import { locale } from '@/lib/i18n';
+import { jobText, locale } from '@/lib/i18n';
+import { fits } from '@/lib/suggest';
 import { supabase } from '@/lib/supabase';
 import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 
@@ -23,7 +25,7 @@ type Hit = {
 const KIND_WORD: Record<Hit['kind'], string> = { message: 'Message', question: 'Question', solution: 'Solution', task: 'Task' };
 const when = (iso: string) => new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
 
-type Place = { key: string; name: string; kind: 'Company' | 'Project' | 'Group' | 'Team'; where: string; open: () => void };
+type Place = { key: string; name: string; kind: 'Company' | 'Project' | 'Group' | 'Team' | 'Person'; where: string; open: () => void };
 
 /**
  * One search bar for everything: companies, projects, groups and teams show up while typing,
@@ -35,6 +37,7 @@ export default function SearchScreen() {
   const router = useRouter();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
   const { companies, projects, subgroups } = useWorkspace();
+  const { people } = useMyPeople();
   const [text, setText] = useState('');
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [asked, setAsked] = useState('');
@@ -87,7 +90,27 @@ export default function SearchScreen() {
               open: () => router.push({ pathname: '/group/[id]', params: { id: s.id } }),
             }),
           ),
-        ].filter((place) => fold(place.name).includes(typed));
+        ]
+          .filter((place) => fold(place.name).includes(typed))
+          .concat(
+            // People you share a project with or are connected to. Pressing one opens your private chat.
+            people
+              .filter((person) => fits(text, person.full_name))
+              .map(
+                (person): Place => ({
+                  key: `u${person.user_id}`,
+                  name: person.full_name,
+                  kind: 'Person',
+                  where: jobText(person.position, person.company_name),
+                  open: async () => {
+                    if (!canMessage(person)) return router.push('/connections');
+                    const chat = await startChat(person.user_id);
+                    if (chat.id) router.push({ pathname: '/messages/[id]', params: { id: chat.id } });
+                    else setError(chat.error);
+                  },
+                }),
+              ),
+          );
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
@@ -95,7 +118,7 @@ export default function SearchScreen() {
         {wide && <ThemedText type="title">Search</ThemedText>}
         <Card>
           <Field
-            label="Search companies, projects, groups, teams, messages, questions and tasks"
+            label="Search people, companies, projects, groups, teams, messages, questions and tasks"
             value={text}
             onChangeText={setText}
             autoCapitalize="none"
@@ -124,7 +147,7 @@ export default function SearchScreen() {
                     {place.name}
                   </ThemedText>
                   <View style={styles.meta}>
-                    <Chip text={place.kind} tone={place.kind === 'Company' ? 'accent' : place.kind === 'Project' ? 'sky' : 'lavender'} />
+                    <Chip text={place.kind} tone={place.kind === 'Company' ? 'accent' : place.kind === 'Project' ? 'sky' : place.kind === 'Person' ? 'ok' : 'lavender'} />
                     <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1} style={styles.grow}>
                       {place.where}
                     </ThemedText>
@@ -180,7 +203,7 @@ export default function SearchScreen() {
         )}
         {!hits && !busy && !asked && (
           <ThemedText type="small" themeColor="textSecondary">
-            Companies, projects, groups and teams appear while you type. Press Search to also look in every chat, question, solution and task you can see. Turkish letters do not matter.
+            People, companies, projects, groups and teams appear while you type. Press Search to also look in every chat, question, solution and task you can see. Turkish letters do not matter.
           </ThemedText>
         )}
       </View>

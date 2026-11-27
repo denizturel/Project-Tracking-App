@@ -3,10 +3,12 @@ import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { NewProject } from '@/components/new-project';
+import { Suggestions } from '@/components/suggestions';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, MoreMenu, TextButton } from '@/components/ui';
 import { Spacing, WideContentWidth } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
+import { type Suggested, useUsernameSuggestions } from '@/lib/suggest';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type CompanyNode, useWorkspace } from '@/lib/workspace';
@@ -17,7 +19,7 @@ type CompanyPerson = {
   role: Role;
   profile: { full_name: string; position: string | null; username: string | null } | null;
 };
-type Found = { user_id: string; username: string | null; full_name: string; position: string | null; company_name: string | null };
+type Found = Suggested;
 
 const ROLE_WORDS: Record<Role, string> = { owner: 'Owner', admin: 'Company admin', manager: 'Manager', member: 'Staff', guest: 'Guest' };
 const COMPANY_ROLES = [
@@ -261,6 +263,9 @@ function AddPerson({ company, people, onAdded }: { company: CompanyNode; people:
   const [failed, setFailed] = useState<string | null>(null);
   const [added, setAdded] = useState<string | null>(null);
 
+  // People whose username starts with what is typed, offered while typing. People already here are left out.
+  const offered = useUsernameSuggestions(username, !found).filter((person) => !people.some((p) => p.user_id === person.user_id));
+
   async function find() {
     setBusy(true);
     setAdded(null);
@@ -288,7 +293,7 @@ function AddPerson({ company, people, onAdded }: { company: CompanyNode; people:
     <Card tint="mint">
       <ThemedText type="subtitle">Add a person to the company</ThemedText>
       <ThemedText themeColor="textSecondary">
-        Type their username. They join straight away, and you can then add them to projects.
+        Start typing their username and pick them from the list. They join straight away, and you can then add them to projects.
       </ThemedText>
       <Field
         label="Username"
@@ -300,6 +305,15 @@ function AddPerson({ company, people, onAdded }: { company: CompanyNode; people:
         autoCapitalize="none"
         autoCorrect={false}
         onSubmitEditing={() => username.trim().length >= 3 && find()}
+      />
+      <Suggestions
+        people={offered}
+        onPick={(person) => {
+          setUsername(person.username ?? '');
+          setAdded(null);
+          setFailed(null);
+          setFound(person);
+        }}
       />
       <Button title="Find" icon="search" variant="secondary" onPress={find} loading={busy && !found} disabled={username.trim().length < 3} />
       <ErrorText>{failed}</ErrorText>

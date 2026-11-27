@@ -7,7 +7,9 @@ import { Avatar, Button, Card, Chip, ErrorText, Field, TextButton, MoreMenu } fr
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { acceptConnection, askToConnect, type MyPerson, removeConnection, startChat, unblockPerson, useMyPeople } from '@/lib/direct';
+import { Suggestions } from '@/components/suggestions';
 import { useAuth } from '@/lib/auth';
+import { useUsernameSuggestions } from '@/lib/suggest';
 import { jobText } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
@@ -52,6 +54,9 @@ export default function ConnectionsScreen() {
     setFailed(chat.error);
     if (chat.id) router.push({ pathname: '/messages/[id]', params: { id: chat.id } });
   }
+
+  // People whose username starts with what is typed, offered while typing.
+  const offered = useUsernameSuggestions(username, !found);
 
   async function find() {
     setSearching(true);
@@ -166,6 +171,14 @@ export default function ConnectionsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             onSubmitEditing={find}
+          />
+          <Suggestions
+            people={offered}
+            onPick={(person) => {
+              setUsername(person.username ?? '');
+              setFailed(null);
+              setFound(person);
+            }}
           />
           <Button title="Find" icon="search" variant="secondary" onPress={find} loading={searching} disabled={username.replace(/^@+/, '').length < 3} />
           {found === 'nobody' && (

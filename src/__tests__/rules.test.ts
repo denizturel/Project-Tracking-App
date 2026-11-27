@@ -5,6 +5,7 @@ jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 import { cleanUsername } from '@/components/username-field';
 import { canMessage, type MyPerson } from '@/lib/direct';
 import { appLink, tokenFrom } from '@/lib/join-link';
+import { fits } from '@/lib/suggest';
 import { parseDate } from '@/lib/use-rows';
 
 const person = (over: Partial<MyPerson>): MyPerson => ({
@@ -52,5 +53,16 @@ describe('dates typed by hand', () => {
     expect(parseDate('tomorrow')).toBeNull();
     expect(parseDate('99.99.2026')).toBeNull();
     expect(parseDate('')).toBeNull();
+  });
+});
+
+describe('suggestions while typing', () => {
+  it('fit from the first letters of any word, Turkish letters or not', () => {
+    expect(fits('de', 'Deniz Türel')).toBe(true);
+    expect(fits('tur', 'Deniz Türel')).toBe(true);
+    expect(fits('de tu', 'Deniz Türel')).toBe(true);
+    expect(fits('niz', 'Deniz Türel')).toBe(false);
+    expect(fits('@deniz', 'Someone', null, 'deniz.turel')).toBe(true);
+    expect(fits('', 'Anyone')).toBe(true);
   });
 });

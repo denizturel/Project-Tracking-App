@@ -8,6 +8,7 @@ export const TR: Record<string, string> = {
   Project: 'Proje',
   Group: 'Grup',
   Team: 'Ekip',
+  Person: 'Kişi',
   Profile: 'Profil',
   Settings: 'Ayarlar',
   'All projects': 'Tüm projeler',
@@ -31,6 +32,14 @@ export const TR: Record<string, string> = {
   Messages: 'Mesajlar',
   'No projects yet. Create one from All projects.': 'Henüz proje yok. Tüm projeler ekranından oluşturun.',
   'No projects here yet.': 'Burada henüz proje yok.',
+  'Search people, companies, projects, groups, teams, messages, questions and tasks': 'Kişi, şirket, proje, grup, ekip, mesaj, soru ve görev ara',
+  'People, companies, projects, groups and teams appear while you type. Press Search to also look in every chat, question, solution and task you can see. Turkish letters do not matter.':
+    'Kişiler, şirketler, projeler, gruplar ve ekipler yazarken görünür. Ara düğmesi, görebildiğiniz tüm sohbet, soru, çözüm ve görevlerde de arar. Türkçe harfler fark etmez.',
+  'Type a name': 'Bir ad yazın',
+  'Nobody in the company fits this name.': 'Şirkette bu ada uyan kimse yok.',
+  'More people fit. Type a name to find them.': 'Uyan başka kişiler de var. Bulmak için bir ad yazın.',
+  'Start typing their username and pick them from the list. They join straight away, and you can then add them to projects.':
+    'Kullanıcı adını yazmaya başlayın ve listeden seçin. Hemen şirkete katılır, sonra projelere ekleyebilirsiniz.',
   'You can pin 2 projects at most. Unpin one first.':
     'En fazla 2 proje sabitleyebilirsiniz. Önce birini kaldırın.',
   'You can pin 2 companies at most. Unpin one first.':
