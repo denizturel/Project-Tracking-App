@@ -146,6 +146,7 @@ type CardProps = {
 
 /** One schedule: title, List / Timeline / Calendar switch, progress bar and the milestones. */
 export function ScheduleCard({ info, place, rows, view, onView, onChanged }: CardProps) {
+  const narrow = useWindowDimensions().width < 480;
   const theme = useTheme();
   const list = rows.filter((m) => m.subgroup_id === (place?.id ?? null));
   const percent = percentAlong(list);
@@ -210,9 +211,11 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
             }
             return (
               <View key={m.id} style={styles.step}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.stepDate}>
-                  {dateText(m)}
-                </ThemedText>
+                {!narrow && (
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.stepDate}>
+                    {dateText(m)}
+                  </ThemedText>
+                )}
                 <View style={styles.rail}>
                   <View
                     style={[
@@ -226,6 +229,12 @@ export function ScheduleCard({ info, place, rows, view, onView, onChanged }: Car
                   {index < list.length - 1 && <View style={[styles.wire, { backgroundColor: theme.border }]} />}
                 </View>
                 <View style={styles.stepBody}>
+                  {/* On a phone the date sits above the title, so the text keeps the full width. */}
+                  {narrow && (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {dateText(m)}
+                    </ThemedText>
+                  )}
                   <ThemedText type={status === 'now' ? 'bold' : 'default'}>{m.title}</ThemedText>
                   {isMeeting(m) && (
                     <View style={styles.tools}>
@@ -362,13 +371,13 @@ function MilestoneForm({ info, place, milestone, meeting, onClose, onChanged }: 
       {asMeeting ? (
         <>
           <View style={styles.dates}>
-            <View style={styles.grow}>
+            <View style={styles.dateCell}>
               <Field label="Day (day.month.year)" required value={due} onChangeText={setDue} placeholder="15.12.2026" />
             </View>
-            <View style={styles.grow}>
+            <View style={styles.dateCell}>
               <Field label="From" value={from} onChangeText={setFrom} placeholder="10:00" />
             </View>
-            <View style={styles.grow}>
+            <View style={styles.dateCell}>
               <Field label="To" value={to} onChangeText={setTo} placeholder="11:00" />
             </View>
           </View>
@@ -636,6 +645,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   grow: { flex: 1, minWidth: 0 },
+  dateCell: { flexGrow: 1, flexBasis: 120, minWidth: 0 },
   bar: { height: 8, borderRadius: 999, overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 999 },
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 58 },

@@ -94,7 +94,7 @@ export function Sidebar() {
 
       {!loading && companies.length === 0 && (
         <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
-          No projects yet. Create one from All projects.
+          No projects yet. Create a company space on the home page, or wait for an invitation to one.
         </ThemedText>
       )}
 

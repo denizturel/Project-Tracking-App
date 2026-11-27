@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { type ComponentRef, useEffect, useRef } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -324,8 +324,19 @@ type TabBarProps = {
 /** Underlined tabs with small counts, as in the prototype. */
 function TabBar(props: TabBarProps) {
   const theme = useTheme();
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const places = useRef<Record<string, number>>({});
+  // The chosen tab is brought into view, also when the page was opened straight on it.
+  const show = (tab: string) => {
+    const x = places.current[tab];
+    if (x !== undefined) scroller.current?.scrollTo({ x: Math.max(0, x - 24), animated: false });
+  };
+  useEffect(() => {
+    show(props.value);
+  }, [props.value]);
   return (
     <ScrollView
+      ref={scroller}
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.tabScroll}
@@ -339,6 +350,10 @@ function TabBar(props: TabBarProps) {
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             onPress={() => props.onChange(tab)}
+            onLayout={(event) => {
+              places.current[tab] = event.nativeEvent.layout.x;
+              if (active) show(tab);
+            }}
             style={[styles.tab, { borderBottomColor: active ? theme.primary : 'transparent' }]}>
             <ThemedText type="bold" themeColor={active ? 'text' : 'textSecondary'}>
               {props.labels[tab] ?? tab}

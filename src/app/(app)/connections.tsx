@@ -56,7 +56,9 @@ export default function ConnectionsScreen() {
   }
 
   // People whose username starts with what is typed, offered while typing.
-  const offered = useUsernameSuggestions(username, !found);
+  const offered = useUsernameSuggestions(username, !found).filter(
+    (person) => !people.some((p) => p.user_id === person.user_id && p.connection === 'connected'),
+  );
 
   async function find() {
     setSearching(true);

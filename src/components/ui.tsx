@@ -1,14 +1,16 @@
 import Feather from '@expo/vector-icons/Feather';
-import { type ComponentProps, type ReactNode, useState } from 'react';
+import { type ComponentProps, type ComponentRef, type ReactNode, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   type TextInputProps,
+  useWindowDimensions,
   View,
   type ViewProps,
 } from 'react-native';
@@ -155,24 +157,45 @@ export function Button({ title, icon, inline, small, onPress, variant = 'primary
   );
 }
 
-export function Field({ label, required, ...rest }: TextInputProps & { label: string; required?: boolean }) {
+export function Field({ label, required, secureTextEntry, ...rest }: TextInputProps & { label: string; required?: boolean }) {
   const theme = useTheme();
+  // Password boxes get an eye button: press to see what was typed, press again to hide it.
+  const [visible, setVisible] = useState(false);
+  const input = (
+    <TextInput
+      accessibilityLabel={label}
+      placeholderTextColor={theme.textSecondary}
+      style={[
+        styles.input,
+        { backgroundColor: theme.card, borderColor: theme.border, color: theme.text },
+        secureTextEntry && styles.inputWithEye,
+      ]}
+      {...rest}
+      secureTextEntry={secureTextEntry && !visible}
+      placeholder={rest.placeholder ? tr(rest.placeholder) : undefined}
+    />
+  );
   return (
     <View style={styles.field}>
       <ThemedText type="smallBold" themeColor="textSecondary">
         {label}
         {required ? ' *' : ''}
       </ThemedText>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={theme.textSecondary}
-        style={[
-          styles.input,
-          { backgroundColor: theme.card, borderColor: theme.border, color: theme.text },
-        ]}
-        {...rest}
-        placeholder={rest.placeholder ? tr(rest.placeholder) : undefined}
-      />
+      {secureTextEntry ? (
+        <View>
+          {input}
+          <View style={styles.eye}>
+            <IconButton
+              icon={visible ? 'eye-off' : 'eye'}
+              label={visible ? 'Hide password' : 'Show password'}
+              onPress={() => setVisible(!visible)}
+              color="textSecondary"
+            />
+          </View>
+        </View>
+      ) : (
+        input
+      )}
     </View>
   );
 }
@@ -210,11 +233,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonSmall: { minHeight: 40, paddingHorizontal: 14, borderRadius: Radius.small },
-  seg: { flexDirection: 'row', borderRadius: 12, padding: 4, gap: 2, alignSelf: 'flex-start' },
-  segItem: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 9 },
-  more: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.three, borderWidth: 1, borderRadius: 12, paddingLeft: Spacing.three, paddingRight: 2 },
+  seg: { flexDirection: 'row', flexWrap: 'wrap', maxWidth: '100%', borderRadius: 12, padding: 4, gap: 2, alignSelf: 'flex-start' },
+  segItem: { paddingVertical: 7, paddingHorizontal: 14, borderRadius: 9, flexShrink: 1 },
+  more: {
+    position: 'absolute',
+    minWidth: 190,
+    maxWidth: 300,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  moreRow: { minHeight: 46, justifyContent: 'center', paddingHorizontal: Spacing.three + 4 },
   iconButton: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, flexShrink: 1, maxWidth: '100%' },
   choice: { borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 },
   search: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, minHeight: 54 },
   searchInput: { flex: 1, fontSize: 17, fontFamily: Type.body, paddingVertical: 10, outlineStyle: 'none' } as never,
@@ -229,6 +265,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
   },
   field: { gap: Spacing.one },
+  inputWithEye: { paddingRight: 52 },
+  eye: { position: 'absolute', right: 4, top: 0, bottom: 0, justifyContent: 'center' },
   input: {
     minHeight: 48,
     borderRadius: Radius.small,
@@ -326,34 +364,55 @@ export type MenuAction = { title: string; onPress: () => void; danger?: boolean;
  */
 export function MoreMenu({ actions, label = 'More actions' }: { actions: (MenuAction | false | null | undefined)[]; label?: string }) {
   const theme = useTheme();
-  const [open, setOpen] = useState(false);
+  const screen = useWindowDimensions();
+  const anchor = useRef<ComponentRef<typeof View>>(null);
+  // Where the button is on the screen while the menu is open; the menu drops from there.
+  const [at, setAt] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [sure, setSure] = useState<string | null>(null);
   const shown = actions.filter((a): a is MenuAction => !!a);
   if (shown.length === 0) return null;
   const close = () => {
-    setOpen(false);
+    setAt(null);
     setSure(null);
   };
-  if (!open) return <IconButton icon="more-vertical" label={label} onPress={() => setOpen(true)} />;
+  const open = () => anchor.current?.measureInWindow((x: number, y: number, width: number, height: number) => setAt({ x, y, width, height }));
+  // Near the bottom of the screen the menu opens upwards, so it is never cut off.
+  const upwards = !!at && at.y > screen.height - (shown.length * 48 + 40);
+
   return (
-    <View style={[styles.more, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      {shown.map((action) => (
-        <TextButton
-          key={action.title}
-          title={sure === action.title ? 'Yes, I am sure' : action.title}
-          danger={action.danger}
-          disabled={action.disabled}
-          onPress={() => {
-            if (action.confirm && sure !== action.title) {
-              setSure(action.title);
-              return;
-            }
-            close();
-            action.onPress();
-          }}
-        />
-      ))}
-      <IconButton icon="x" label="Close" onPress={close} />
+    <View ref={anchor} collapsable={false}>
+      <IconButton icon="more-vertical" label={label} onPress={open} />
+      <Modal visible={!!at} transparent animationType="none" statusBarTranslucent onRequestClose={close}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+        {at && (
+          <View
+            style={[
+              styles.more,
+              { backgroundColor: theme.card, borderColor: theme.border, right: Math.max(8, screen.width - at.x - at.width) },
+              upwards ? { bottom: screen.height - at.y + 4 } : { top: at.y + at.height + 4 },
+            ]}>
+            {shown.map((action) => (
+              <Pressable
+                key={action.title}
+                accessibilityRole="button"
+                disabled={action.disabled}
+                onPress={() => {
+                  if (action.confirm && sure !== action.title) {
+                    setSure(action.title);
+                    return;
+                  }
+                  close();
+                  action.onPress();
+                }}
+                style={({ pressed }) => [styles.moreRow, { opacity: action.disabled ? 0.4 : pressed ? 0.6 : 1 }]}>
+                <ThemedText type="smallBold" style={{ color: action.danger ? theme.danger : theme.text }}>
+                  {sure === action.title ? 'Yes, I am sure' : action.title}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </Modal>
     </View>
   );
 }

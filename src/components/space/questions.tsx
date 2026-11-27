@@ -294,7 +294,7 @@ function QuestionCard({ question, place, me, isAdmin, forceOpen, onChanged }: Ca
           onPress={() => setOpened(!opened)}
           style={[styles.grow, { gap: 8 }]}>
           <View style={styles.titleRow}>
-            <ThemedText type="bold" style={[styles.grow, { fontSize: 18 }]}>
+            <ThemedText type="bold" style={styles.title}>
               {question.title}
             </ThemedText>
             {solved ? (
@@ -490,7 +490,9 @@ const styles = StyleSheet.create({
   byPlace: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   question: { borderLeftWidth: 4, gap: 12 },
   questionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' },
+  // The title keeps a readable width; on a narrow phone the status tag moves under it.
+  title: { flexGrow: 1, flexShrink: 1, flexBasis: 170, minWidth: 0, fontSize: 18 },
   personTag: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingRight: 10, padding: 3 },
   verdict: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexWrap: 'wrap' },

@@ -35,7 +35,7 @@ export default function NotificationsScreen() {
         {!loading && notices.length === 0 && (
           <Card>
             <ThemedText themeColor="textSecondary">
-              Nothing yet. You will see here when someone adds you to a project, group or team, or wants to connect with you.
+              Nothing yet. You will see here when someone invites you to a company, adds you to a project, group or team, or wants to connect with you.
             </ThemedText>
           </Card>
         )}

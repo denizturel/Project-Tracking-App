@@ -39,14 +39,14 @@ export default function SettingsScreen() {
         <Card>
           <View style={styles.setting}>
             <Icon name="globe" size={24} color="primary" />
-            <ThemedText type="bold" style={styles.grow}>
+            <ThemedText type="bold" style={styles.settingName}>
               Language
             </ThemedText>
             <Choices options={LANGUAGES} value={prefs.lang} onChange={setLang} />
           </View>
           <View style={styles.setting}>
             <Icon name={prefs.mode === 'dark' ? 'moon' : 'sun'} size={24} color="primary" />
-            <ThemedText type="bold" style={styles.grow}>
+            <ThemedText type="bold" style={styles.settingName}>
               Day or night mode
             </ThemedText>
             <Choices options={MODES} value={prefs.mode} onChange={setMode} />
@@ -227,5 +227,7 @@ const styles = StyleSheet.create({
   list: { paddingVertical: Spacing.one },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.two },
   grow: { flex: 1, minWidth: 0 },
+  // A setting's name keeps its width; on a narrow phone the choices move under it.
+  settingName: { flexGrow: 1, flexShrink: 0, minWidth: 130 },
   buttons: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
 });

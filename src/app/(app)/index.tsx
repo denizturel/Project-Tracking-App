@@ -380,6 +380,24 @@ function NewCompany({ first }: { first: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Companies that already exist with a similar name, shown while typing so nobody creates a second one.
+  const [similar, setSimilar] = useState<{ id: string; name: string; mine: boolean }[]>([]);
+  const typed = name.trim();
+  useEffect(() => {
+    if (typed.length < 2) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      supabase.rpc('similar_companies', { q: typed }).then((result) => {
+        if (active) setSimilar((result.data as { id: string; name: string; mine: boolean }[] | null) ?? []);
+      });
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [typed]);
+  const found = typed.length < 2 ? [] : similar;
+
   async function create() {
     setBusy(true);
     setError(null);
@@ -409,8 +427,25 @@ function NewCompany({ first }: { first: boolean }) {
           : 'A separate, closed space with its own people and projects.'}
       </ThemedText>
       <Field label="Company name" required value={name} onChangeText={setName} />
+      {found.length > 0 && (
+        <View style={{ gap: 6 }}>
+          <ThemedText type="smallBold">These companies already exist</ThemedText>
+          {found.map((company) => (
+            <View key={company.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Icon name="briefcase" size={18} color="textSecondary" />
+              <ThemedText raw style={{ flex: 1 }} numberOfLines={1}>
+                {company.name}
+              </ThemedText>
+              {company.mine && <Chip text="You are in it" tone="ok" />}
+            </View>
+          ))}
+          <ThemedText type="small" themeColor="textSecondary">
+            If one of them is your company, do not create it again. Ask its owner or an admin to invite you with your username.
+          </ThemedText>
+        </View>
+      )}
       <ErrorText>{error}</ErrorText>
-      <Button title="Create company space" onPress={create} loading={busy} disabled={!name.trim()} />
+      <Button title={found.length > 0 ? 'None of these, create a new one' : 'Create company space'} onPress={create} loading={busy} disabled={!name.trim()} />
       {!first && <Button title="Cancel" variant="plain" onPress={() => setOpen(false)} disabled={busy} />}
     </Card>
   );

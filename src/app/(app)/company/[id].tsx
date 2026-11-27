@@ -281,18 +281,23 @@ function Waiting({ company, invited, onInvited }: { company: CompanyNode; invite
       </ThemedText>
       <ErrorText>{failed}</ErrorText>
       {waiting.map((person) => (
-        <View key={person.user_id} style={styles.line}>
-          <Avatar name={person.full_name} size={40} />
-          <View style={styles.grow}>
-            <ThemedText type="bold" raw numberOfLines={1}>
-              {person.full_name}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1}>
-              {[person.username ? `@${person.username}` : null, person.position].filter(Boolean).join(' · ')}
-            </ThemedText>
+        <View key={person.user_id} style={styles.candidate}>
+          <View style={[styles.line, styles.candidateName]}>
+            <Avatar name={person.full_name} size={40} />
+            <View style={styles.grow}>
+              <ThemedText type="bold" raw numberOfLines={1}>
+                {person.full_name}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1}>
+                {[person.username ? `@${person.username}` : null, person.position].filter(Boolean).join(' · ')}
+              </ThemedText>
+            </View>
           </View>
-          <Button title="Invite as staff" small variant="secondary" onPress={() => invite(person, 'member')} />
-          <MoreMenu actions={[{ title: 'Invite as guest', onPress: () => invite(person, 'guest') }]} />
+          {/* The buttons go under the name when the screen is narrow. */}
+          <View style={styles.line}>
+            <Button title="Invite as staff" small inline variant="secondary" onPress={() => invite(person, 'member')} />
+            <MoreMenu actions={[{ title: 'Invite as guest', onPress: () => invite(person, 'guest') }]} />
+          </View>
         </View>
       ))}
     </Card>
@@ -403,6 +408,8 @@ function AddPerson({ company, people, onInvited }: { company: CompanyNode; peopl
 const styles = StyleSheet.create({
   page: { width: '100%', maxWidth: WideContentWidth, alignSelf: 'center', padding: 16, paddingBottom: 48, gap: 18 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  candidate: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  candidateName: { flexGrow: 1, flexBasis: 200, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.three },
 });
