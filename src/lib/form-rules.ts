@@ -43,9 +43,15 @@ export function phoneProblem(text: string): string | null {
   return cleanPhone(text) ? null : 'Write the phone number with its country code. Example: +90 532 123 45 67';
 }
 
-export const PASSWORD_RULE = 'At least 8 characters, with a letter and a number.';
+export const PASSWORD_RULE = 'At least 8 characters, with a capital letter, a small letter, a number and a symbol.';
 
 export function passwordProblem(password: string): string | null {
   if (!password) return null;
-  return password.length >= 8 && /\p{L}/u.test(password) && /\d/.test(password) ? null : PASSWORD_RULE;
+  const ok =
+    password.length >= 8 &&
+    /\p{Lu}/u.test(password) &&
+    /\p{Ll}/u.test(password) &&
+    /\d/.test(password) &&
+    /[^\p{L}\d\s]/u.test(password);
+  return ok ? null : PASSWORD_RULE;
 }

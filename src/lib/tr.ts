@@ -35,7 +35,7 @@ export const TR: Record<string, string> = {
   'Password again': 'Şifre (tekrar)',
   'New password': 'Yeni şifre',
   'The two passwords are not the same.': 'İki şifre aynı değil.',
-  'At least 8 characters, with a letter and a number.': 'En az 8 karakter, içinde bir harf ve bir rakam olmalı.',
+  'At least 8 characters, with a capital letter, a small letter, a number and a symbol.': 'En az 8 karakter; büyük harf, küçük harf, rakam ve simge içermeli.',
   'This email address does not look right. Example: name@company.com': 'Bu e-posta adresi doğru görünmüyor. Örnek: ad@sirket.com',
   'Write the phone number with its country code. Example: +90 532 123 45 67': 'Telefon numarasını ülke koduyla yazın. Örnek: +90 532 123 45 67',
   'New people who wrote this company': 'Bu şirketi yazan yeni kişiler',

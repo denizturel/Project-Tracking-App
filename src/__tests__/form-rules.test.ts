@@ -27,11 +27,14 @@ describe('the standard for names, email, phone and password', () => {
     expect(phoneProblem('123')).not.toBeNull();
   });
 
-  it('asks for 8 characters with a letter and a number', () => {
-    expect(passwordProblem('abc12345')).toBeNull();
-    expect(passwordProblem('şifre2026')).toBeNull();
-    expect(passwordProblem('abcdefgh')).not.toBeNull();
-    expect(passwordProblem('12345678')).not.toBeNull();
-    expect(passwordProblem('ab12')).not.toBeNull();
+  it('asks for 8 characters with a capital letter, a small letter, a number and a symbol', () => {
+    expect(passwordProblem('Abc1234!')).toBeNull();
+    expect(passwordProblem('Şifre2026.')).toBeNull();
+    expect(passwordProblem('abc12345')).not.toBeNull();
+    expect(passwordProblem('abc1234!')).not.toBeNull();
+    expect(passwordProblem('ABC1234!')).not.toBeNull();
+    expect(passwordProblem('Abcdefg!')).not.toBeNull();
+    expect(passwordProblem('Abc12345')).not.toBeNull();
+    expect(passwordProblem('Ab1!')).not.toBeNull();
   });
 });
