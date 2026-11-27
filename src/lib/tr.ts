@@ -32,6 +32,20 @@ export const TR: Record<string, string> = {
   Messages: 'Mesajlar',
   'No projects yet. Create one from All projects.': 'Henüz proje yok. Tüm projeler ekranından oluşturun.',
   'No projects here yet.': 'Burada henüz proje yok.',
+  Invitations: 'Davetler',
+  Invited: 'Davet edildi',
+  'These people were invited. They join the company when they accept.': 'Bu kişiler davet edildi. Kabul ettiklerinde şirkete katılırlar.',
+  'Take back the invitation': 'Daveti geri al',
+  "They wrote this company's name when they signed up. Invite only the people you know.": 'Kayıt olurken bu şirketin adını yazdılar. Yalnızca tanıdığınız kişileri davet edin.',
+  'Invite as staff': 'Personel olarak davet et',
+  'Invite as guest': 'Misafir olarak davet et',
+  'Invite a person to the company': 'Şirkete kişi davet et',
+  'Start typing their username and pick them from the list. They get an invitation and join the company when they accept it. After that you can add them to projects.':
+    'Kullanıcı adını yazmaya başlayın ve listeden seçin. Bir davet alır ve kabul edince şirkete katılır. Sonra projelere ekleyebilirsiniz.',
+  'Send invitation': 'Davet gönder',
+  'Only the owner or a company admin can invite people to the company.': 'Şirkete yalnızca sahip veya şirket yöneticisi kişi davet edebilir.',
+  'This person cannot be invited.': 'Bu kişi davet edilemez.',
+  'This invitation is not open any more.': 'Bu davet artık açık değil.',
   'Search people, companies, projects, groups, teams, messages, questions and tasks': 'Kişi, şirket, proje, grup, ekip, mesaj, soru ve görev ara',
   'People, companies, projects, groups and teams appear while you type. Press Search to also look in every chat, question, solution and task you can see. Turkish letters do not matter.':
     'Kişiler, şirketler, projeler, gruplar ve ekipler yazarken görünür. Ara düğmesi, görebildiğiniz tüm sohbet, soru, çözüm ve görevlerde de arar. Türkçe harfler fark etmez.',
@@ -534,6 +548,9 @@ export const TR: Record<string, string> = {
 
 /** Texts with a changing part. {0} {1}: kept as written. {n}: a number. {t}: translated too. */
 export const TR_PATTERNS: [string, string][] = [
+  ['{0} invited you to the company {1} as a guest', '{0} sizi {1} şirketine misafir olarak davet etti'],
+  ['{0} invited you to the company {1}', '{0} sizi {1} şirketine davet etti'],
+  ['{0} accepted your invitation to {1}', '{0}, {1} davetinizi kabul etti'],
   ['{0} added you to the company {1}', '{0} sizi {1} şirketine ekledi'],
   ['{0} added you to the project {1}', '{0} sizi {1} projesine ekledi'],
   ['{0} added you to the group {1}', '{0} sizi {1} grubuna ekledi'],

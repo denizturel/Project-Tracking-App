@@ -9,6 +9,7 @@ import { Avatar, Button, Card, Chip, Choices, ErrorText, Field, Icon, MoreMenu, 
 import { Spacing, WideContentWidth } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { type Suggested, useUsernameSuggestions } from '@/lib/suggest';
+import { useLiveVersion } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
 import { type CompanyNode, useWorkspace } from '@/lib/workspace';
@@ -20,6 +21,7 @@ type CompanyPerson = {
   profile: { full_name: string; position: string | null; username: string | null } | null;
 };
 type Found = Suggested;
+type OpenInvite = { id: string; user_id: string; username: string | null; full_name: string; position: string | null; role: Role };
 
 const ROLE_WORDS: Record<Role, string> = { owner: 'Owner', admin: 'Company admin', manager: 'Manager', member: 'Staff', guest: 'Guest' };
 const COMPANY_ROLES = [
@@ -69,6 +71,13 @@ function CompanyPage({ company }: { company: CompanyNode }) {
       .select('user_id, role, profile:profiles!user_id(full_name, position, username)')
       .eq('company_id', company.id)
       .returns<CompanyPerson[]>(),
+  );
+  // Invitations that were sent and not answered yet. Asked again now and then, so an answer shows by itself.
+  const live = useLiveVersion();
+  const invites = useRows<OpenInvite>(`company3:${company.id}:${admin}:${live}`, () =>
+    admin
+      ? (supabase.rpc('company_open_invites', { company: company.id }) as unknown as PromiseLike<{ data: OpenInvite[] | null; error: { message: string } | null }>)
+      : Promise.resolve({ data: [] as OpenInvite[], error: null }),
   );
   const people = [...rows].sort((a, b) => (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
   const mine = projects.filter((p) => p.company_id === company.id);
@@ -132,8 +141,43 @@ function CompanyPage({ company }: { company: CompanyNode }) {
         <ErrorText>{failed ?? error}</ErrorText>
       </Card>
 
-      {admin && <Waiting company={company} onAdded={reload} />}
-      {admin && <AddPerson company={company} people={people} onAdded={reload} />}
+      {admin && <Waiting company={company} invited={invites.rows.map((i) => i.user_id)} onInvited={invites.reload} />}
+      {admin && <AddPerson company={company} people={people} onInvited={invites.reload} />}
+      {admin && invites.rows.length > 0 && (
+        <Card>
+          <ThemedText type="label">Waiting for their answer</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            These people were invited. They join the company when they accept.
+          </ThemedText>
+          {invites.rows.map((invite) => (
+            <View key={invite.id} style={styles.line}>
+              <Avatar name={invite.full_name} size={40} />
+              <View style={styles.grow}>
+                <ThemedText type="bold" raw numberOfLines={1}>
+                  {invite.full_name}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1}>
+                  {[invite.username ? `@${invite.username}` : null, invite.position].filter(Boolean).join(' · ')}
+                </ThemedText>
+              </View>
+              <Chip text={ROLE_WORDS[invite.role]} tone="plain" />
+              <MoreMenu
+                actions={[
+                  {
+                    title: 'Take back the invitation',
+                    danger: true,
+                    onPress: async () => {
+                      const result = await supabase.rpc('cancel_company_invite', { invite: invite.id });
+                      setFailed(result.error?.message ?? null);
+                      invites.reload();
+                    },
+                  },
+                ]}
+              />
+            </View>
+          ))}
+        </Card>
+      )}
 
       <Card>
         <ThemedText type="label">People</ThemedText>
@@ -206,9 +250,9 @@ type Candidate = { user_id: string; username: string | null; full_name: string; 
 
 /**
  * People who wrote this company's name when they signed up and are not in it yet.
- * Nobody joins by typing a name: the owner or a company admin presses Add.
+ * Nobody joins by typing a name: the owner or a company admin invites them, and they accept.
  */
-function Waiting({ company, onAdded }: { company: CompanyNode; onAdded: () => void }) {
+function Waiting({ company, invited, onInvited }: { company: CompanyNode; invited: string[]; onInvited: () => void }) {
   const { rows, reload } = useRows<Candidate>(`company2:${company.id}`, () =>
     supabase.rpc('company_candidates', { company: company.id }) as unknown as PromiseLike<{ data: Candidate[] | null; error: { message: string } | null }>,
   );
@@ -220,22 +264,23 @@ function Waiting({ company, onAdded }: { company: CompanyNode; onAdded: () => vo
     return () => clearInterval(timer);
   }, [reload]);
 
-  async function add(person: Candidate, role: 'member' | 'guest') {
-    const result = await supabase.from('company_members').insert({ company_id: company.id, user_id: person.user_id, role });
+  async function invite(person: Candidate, role: 'member' | 'guest') {
+    const result = await supabase.rpc('invite_to_company', { company: company.id, person: person.user_id, as_role: role });
     setFailed(result.error?.message ?? null);
     reload();
-    if (!result.error) onAdded();
+    if (!result.error) onInvited();
   }
 
-  if (rows.length === 0) return null;
+  const waiting = rows.filter((person) => !invited.includes(person.user_id));
+  if (waiting.length === 0) return null;
   return (
     <Card tint="butter">
       <ThemedText type="subtitle">New people who wrote this company</ThemedText>
       <ThemedText themeColor="textSecondary">
-        They wrote this company&apos;s name when they signed up. Add only the people you know.
+        They wrote this company&apos;s name when they signed up. Invite only the people you know.
       </ThemedText>
       <ErrorText>{failed}</ErrorText>
-      {rows.map((person) => (
+      {waiting.map((person) => (
         <View key={person.user_id} style={styles.line}>
           <Avatar name={person.full_name} size={40} />
           <View style={styles.grow}>
@@ -246,16 +291,16 @@ function Waiting({ company, onAdded }: { company: CompanyNode; onAdded: () => vo
               {[person.username ? `@${person.username}` : null, person.position].filter(Boolean).join(' · ')}
             </ThemedText>
           </View>
-          <Button title="Add as staff" small variant="secondary" onPress={() => add(person, 'member')} />
-          <MoreMenu actions={[{ title: 'Add as guest', onPress: () => add(person, 'guest') }]} />
+          <Button title="Invite as staff" small variant="secondary" onPress={() => invite(person, 'member')} />
+          <MoreMenu actions={[{ title: 'Invite as guest', onPress: () => invite(person, 'guest') }]} />
         </View>
       ))}
     </Card>
   );
 }
 
-/** Adds someone to the company by their username. No approval step: they are in straight away. */
-function AddPerson({ company, people, onAdded }: { company: CompanyNode; people: CompanyPerson[]; onAdded: () => void }) {
+/** Invites someone to the company by their username. They join only when they accept the invitation. */
+function AddPerson({ company, people, onInvited }: { company: CompanyNode; people: CompanyPerson[]; onInvited: () => void }) {
   const [username, setUsername] = useState('');
   const [found, setFound] = useState<Found | 'nobody' | null>(null);
   const [as, setAs] = useState<'member' | 'guest'>('member');
@@ -277,23 +322,23 @@ function AddPerson({ company, people, onAdded }: { company: CompanyNode; people:
 
   async function add(person: Found) {
     setBusy(true);
-    const result = await supabase.from('company_members').insert({ company_id: company.id, user_id: person.user_id, role: as });
+    const result = await supabase.rpc('invite_to_company', { company: company.id, person: person.user_id, as_role: as });
     setBusy(false);
     setFailed(result.error?.message ?? null);
     if (result.error) return;
     setAdded(person.full_name);
     setFound(null);
     setUsername('');
-    onAdded();
+    onInvited();
   }
 
   const already = found && found !== 'nobody' && people.some((p) => p.user_id === found.user_id);
 
   return (
     <Card tint="mint">
-      <ThemedText type="subtitle">Add a person to the company</ThemedText>
+      <ThemedText type="subtitle">Invite a person to the company</ThemedText>
       <ThemedText themeColor="textSecondary">
-        Start typing their username and pick them from the list. They join straight away, and you can then add them to projects.
+        Start typing their username and pick them from the list. They get an invitation and join the company when they accept it. After that you can add them to projects.
       </ThemedText>
       <Field
         label="Username"
@@ -337,7 +382,7 @@ function AddPerson({ company, people, onAdded }: { company: CompanyNode; people:
           ) : (
             <>
               <Choices options={ADD_AS} value={as} onChange={setAs} />
-              <Button title="Add to the company" icon="user-plus" onPress={() => add(found)} loading={busy} />
+              <Button title="Send invitation" icon="user-plus" onPress={() => add(found)} loading={busy} />
             </>
           )}
         </>
@@ -348,7 +393,7 @@ function AddPerson({ company, people, onAdded }: { company: CompanyNode; people:
           <ThemedText raw style={styles.grow}>
             {added}
           </ThemedText>
-          <Chip text="Added" tone="ok" />
+          <Chip text="Invited" tone="ok" />
         </View>
       )}
     </Card>

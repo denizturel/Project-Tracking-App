@@ -34,7 +34,11 @@ export function noticeTarget(notice: Notice): { pathname: string; params?: Recor
   const p = notice.payload;
   const id = (value: unknown) => String(value ?? '');
   switch (notice.kind) {
+    case 'company_invite':
+      // The invitation is answered on the home page; the company cannot be opened before that.
+      return { pathname: '/' };
     case 'added_company':
+    case 'company_invite_accepted':
       return { pathname: '/company/[id]', params: { id: id(p.company_id) } };
     case 'added_project':
       return { pathname: '/project/[id]', params: { id: id(p.project_id) } };
@@ -56,6 +60,10 @@ export function noticeText(notice: Notice): string {
   const by = typeof notice.payload.by_name === 'string' && notice.payload.by_name ? notice.payload.by_name : 'Someone';
   const name = typeof notice.payload.name === 'string' ? notice.payload.name : '';
   switch (notice.kind) {
+    case 'company_invite':
+      return `${by} invited you to the company ${name}`;
+    case 'company_invite_accepted':
+      return `${by} accepted your invitation to ${name}`;
     case 'added_company':
       return `${by} added you to the company ${name}`;
     case 'added_project':
