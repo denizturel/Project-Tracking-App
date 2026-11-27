@@ -18,6 +18,7 @@ import { fold } from '@/lib/fold';
 import { locale, tr } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { markSeen } from '@/lib/unseen';
 import { keptChats } from '@/lib/use-rows';
 
 type Message = {
@@ -137,6 +138,8 @@ export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct
     fetchChat(info, direct, deep).then((result) => {
       if (!result.error) seen.set(memory, result);
       if (active) setData(result);
+      // Messages that arrive while the chat is on screen count as seen.
+      if (active && info) markSeen(info.subgroup?.id ?? info.project.id, 'chat');
     });
     return () => {
       active = false;

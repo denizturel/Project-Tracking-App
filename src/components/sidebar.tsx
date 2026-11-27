@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { useDirectChats } from '@/lib/direct';
 import { jobText } from '@/lib/i18n';
 import { useNotifications } from '@/lib/notifications';
+import { colorOf, type Counts, TAB_KIND, UNSEEN_COLOR, useUnseen } from '@/lib/unseen';
 import { useWorkspace } from '@/lib/workspace';
 
 const ICONS: Record<string, IconName> = {
@@ -45,6 +46,12 @@ export function Sidebar() {
   // Unread private messages; counted again when a chat is opened or left (new messages arrive by themselves).
   const { unread } = useDirectChats(pathname.startsWith('/messages') ? pathname : '');
   const notifications = useNotifications();
+  const unseen = useUnseen();
+  /** The count and colour for one section row; in the simple layout tasks open from Overview. */
+  const news = (counts: Counts, tab: string, simple = false) => {
+    const kind = TAB_KIND[tab] ?? (simple && tab === 'Overview' ? 'tasks' : undefined);
+    return kind && counts[kind] ? { badge: counts[kind], badgeColor: UNSEEN_COLOR[kind] } : {};
+  };
 
   const toggle = (id: string) => setFolded((f) => ({ ...f, [id]: !f[id] }));
   const foldable = [
@@ -148,6 +155,7 @@ export function Sidebar() {
                     depth={0}
                     bold
                     active={false}
+                    news={colorOf(unseen.project(project.id))}
                     folded={!!folded[project.id]}
                     onToggle={() => toggle(project.id)}
                   />
@@ -162,6 +170,7 @@ export function Sidebar() {
                             icon={ICONS[tab]}
                             depth={0}
                             active={pathname === projectPath && currentTab === tab}
+                            {...news(unseen.own(project.id), tab)}
                           />
                         ))}
                       {isActive && groups.length > 0 && <View style={styles.gap} />}
@@ -179,6 +188,7 @@ export function Sidebar() {
                               depth={0}
                               mark={markOf(subgroups, group)}
                               active={groupHere}
+                              news={colorOf(unseen.group(group.id, teams.map((t) => t.id)))}
                               folded={!open}
                               onToggle={() => setFolded((f) => ({ ...f, [group.id]: open }))}
                             />
@@ -194,6 +204,7 @@ export function Sidebar() {
                                       depth={0}
                                       small
                                       active={leafActive(tab, groupSimple)}
+                                      {...news(unseen.own(group.id), tab, groupSimple)}
                                     />
                                   ))}
                                 {groupHere && teams.length > 0 && <View style={styles.gap} />}
@@ -208,6 +219,7 @@ export function Sidebar() {
                                         small
                                         mark={markOf(subgroups, team)}
                                         active={here}
+                                        news={colorOf(unseen.own(team.id))}
                                       />
                                       {here && (
                                         <View style={[styles.branch, { borderLeftColor: theme.border }]}>
@@ -220,6 +232,7 @@ export function Sidebar() {
                                               depth={0}
                                               small
                                               active={leafActive(tab, true)}
+                                              {...news(unseen.own(team.id), tab, true)}
                                             />
                                           ))}
                                         </View>
@@ -415,9 +428,13 @@ type RowProps = {
   badge?: number;
   /** The count is shown in red: something is waiting for you. */
   alert?: boolean;
+  /** The colour of the count, for news of one kind. */
+  badgeColor?: ThemeColor;
+  /** A small coloured dot: something new is inside. */
+  news?: ThemeColor | null;
 };
 
-function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home, badge, alert }: RowProps) {
+function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home, badge, alert, badgeColor, news }: RowProps) {
   const theme = useTheme();
   const closeMenu = use(MenuClose);
 
@@ -436,9 +453,10 @@ function Row({ href, label, depth, icon, bold, small, mark, active, folded, onTo
               style={styles.grow}>
               {label}
             </ThemedText>
+            {!!news && <View accessibilityLabel="Something new" style={[styles.news, { backgroundColor: theme[news] }]} />}
             {!!badge && (
-              <View accessibilityLabel="Unread" style={[styles.badge, { backgroundColor: alert ? theme.danger : theme.primary }]}>
-                <ThemedText type="smallBold" raw style={{ color: alert ? '#fff' : theme.onPrimary, fontSize: 13, lineHeight: 18 }}>
+              <View accessibilityLabel="Unread" style={[styles.badge, { backgroundColor: badgeColor ? theme[badgeColor] : alert ? theme.danger : theme.primary }]}>
+                <ThemedText type="smallBold" raw style={{ color: badgeColor ? theme.card : alert ? '#fff' : theme.onPrimary, fontSize: 13, lineHeight: 18 }}>
                   {badge}
                 </ThemedText>
               </View>
@@ -490,6 +508,7 @@ const styles = StyleSheet.create({
   },
   active: { boxShadow: '0 1px 4px rgba(120, 60, 30, 0.08)' },
   mark: { width: 14, height: 14, borderRadius: 4 },
+  news: { width: 11, height: 11, borderRadius: 6 },
   gap: { height: 8 },
   mini: { alignItems: 'center', paddingVertical: 10, gap: 6, paddingBottom: Spacing.five },
   miniBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

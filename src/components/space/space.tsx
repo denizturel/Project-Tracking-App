@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -15,6 +16,7 @@ import { MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { useRows } from '@/lib/use-rows';
+import { markSeen, TAB_KIND } from '@/lib/unseen';
 import { type ProjectNode, type SubgroupNode, useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 
 /** What a tab needs to know about where it is. */
@@ -139,6 +141,12 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
   // A message opened from Search is shown and marked in the chat.
   const asked = useLocalSearchParams<{ message?: string }>().message;
   const focusMessage = typeof asked === 'string' ? asked : undefined;
+  // Opening the chat, the tasks or the questions of a place takes its "new" mark away.
+  const placeId = info.subgroup?.id ?? info.project.id;
+  const seenKind = TAB_KIND[inner];
+  useEffect(() => {
+    if (seenKind) markSeen(placeId, seenKind);
+  }, [placeId, seenKind]);
   const theme = useTheme();
   const router = useRouter();
   const { subgroups } = useWorkspace();

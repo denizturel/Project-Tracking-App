@@ -9,6 +9,7 @@ import { IconButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { NotificationsProvider, useNotifications } from '@/lib/notifications';
+import { UnseenProvider } from '@/lib/unseen';
 import { WIDE_SCREEN, WorkspaceProvider } from '@/lib/workspace';
 
 /** The same project or group is the same page, whichever of its tabs is asked for. */
@@ -35,6 +36,7 @@ export default function AppLayout() {
   return (
     <WorkspaceProvider>
       <NotificationsProvider>
+      <UnseenProvider>
       <View style={{ flex: 1, flexDirection: 'row', backgroundColor: theme.background }}>
         {wide && pinned && (
           <View style={{ width: 312, borderRightWidth: 1, borderRightColor: theme.border }}>
@@ -104,6 +106,7 @@ export default function AppLayout() {
           <Pressable accessibilityLabel="Close menu" style={styles.backdrop} onPress={() => setOpen(false)} />
         </View>
       )}
+      </UnseenProvider>
       </NotificationsProvider>
     </WorkspaceProvider>
   );
