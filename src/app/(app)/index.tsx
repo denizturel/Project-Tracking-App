@@ -11,8 +11,6 @@ import { useRows } from '@/lib/use-rows';
 import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
 import { NewProject } from '@/components/new-project';
 import { locale } from '@/lib/i18n';
-import { useLiveVersion } from '@/lib/live';
-import { useNotifications } from '@/lib/notifications';
 import { takePendingJoin, tokenFrom } from '@/lib/join-link';
 
 type MilestoneRow = { project_id: string; done: boolean };
@@ -160,7 +158,6 @@ export default function HomeScreen() {
           <View style={[styles.stack, twoColumns && styles.grow]}>
             <ErrorText>{error ?? joinError}</ErrorText>
             {loading && <ActivityIndicator color={theme.primary} size="large" />}
-            <CompanyInvites />
 
             {!wide && adminOf.length > 0 && !creating && (
               <Button title="New project" icon="plus" onPress={() => setCreating(true)} />
@@ -279,54 +276,6 @@ const styles = StyleSheet.create({
   manage: { gap: 12 },
   pick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
-
-type MyInvite = { id: string; company_id: string; company_name: string; role: string; by_name: string | null };
-
-/** Invitations to a company that wait for my answer. Nobody is put into a company without accepting. */
-function CompanyInvites() {
-  const router = useRouter();
-  const { reload: reloadWorkspace } = useWorkspace();
-  const { notices } = useNotifications();
-  const live = useLiveVersion();
-  // A new invitation arrives with a notification, so the list is asked again when one comes.
-  const { rows, reload } = useRows<MyInvite>(`index5:${notices.length}:${live}`, () =>
-    supabase.rpc('my_company_invites') as unknown as PromiseLike<{ data: MyInvite[] | null; error: { message: string } | null }>,
-  );
-  const [failed, setFailed] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  async function answer(invite: MyInvite, accept: boolean) {
-    setBusy(invite.id);
-    const result = await supabase.rpc('respond_company_invite', { invite: invite.id, accept });
-    setBusy(null);
-    setFailed(result.error?.message ?? null);
-    reload();
-    if (result.error || !accept) return;
-    reloadWorkspace();
-    router.push({ pathname: '/company/[id]', params: { id: invite.company_id } });
-  }
-
-  if (rows.length === 0) return null;
-  return (
-    <Card tint="butter">
-      <ThemedText type="subtitle">Invitations</ThemedText>
-      <ErrorText>{failed}</ErrorText>
-      {rows.map((invite) => (
-        <View key={invite.id} style={{ gap: 10 }}>
-          <ThemedText>
-            {invite.role === 'guest'
-              ? `${invite.by_name ?? 'Someone'} invited you to the company ${invite.company_name} as a guest`
-              : `${invite.by_name ?? 'Someone'} invited you to the company ${invite.company_name}`}
-          </ThemedText>
-          <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-            <Button title="Accept" small inline onPress={() => answer(invite, true)} loading={busy === invite.id} />
-            <Button title="Decline" small inline variant="plain" onPress={() => answer(invite, false)} disabled={busy === invite.id} />
-          </View>
-        </View>
-      ))}
-    </Card>
-  );
-}
 
 function JoinWithCode() {
   const router = useRouter();

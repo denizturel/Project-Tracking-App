@@ -29,14 +29,18 @@ export function useNotifications() {
   return value;
 }
 
+/** Invitations and connections have their own list on the Notifications page. */
+export const isInvitation = (notice: Notice) =>
+  notice.kind === 'company_invite' || notice.kind === 'company_invite_accepted' || notice.kind === 'connection_request' || notice.kind === 'connection_accepted';
+
 /** Where pressing a notification takes you. */
 export function noticeTarget(notice: Notice): { pathname: string; params?: Record<string, string> } {
   const p = notice.payload;
   const id = (value: unknown) => String(value ?? '');
   switch (notice.kind) {
     case 'company_invite':
-      // The invitation is answered on the home page; the company cannot be opened before that.
-      return { pathname: '/' };
+      // The invitation is answered on the Notifications page; the company cannot be opened before that.
+      return { pathname: '/notifications' };
     case 'added_company':
     case 'company_invite_accepted':
       return { pathname: '/company/[id]', params: { id: id(p.company_id) } };
