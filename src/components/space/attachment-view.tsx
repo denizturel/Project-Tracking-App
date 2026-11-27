@@ -42,18 +42,19 @@ function Picture({ item }: { item: Attachment }) {
   return (
     <>
       <Pressable accessibilityRole="imagebutton" accessibilityLabel={item.file_name ?? 'Picture'} onPress={() => setLarge(true)} disabled={!url}>
-        <Image source={url ? { uri: url } : undefined} contentFit="cover" style={[styles.picture, { backgroundColor: theme.backgroundElement }]} />
+        {/* Kept on the phone under the file's own name: the address changes every hour, the picture does not. */}
+        <Image source={url ? { uri: url, cacheKey: item.storage_path ?? undefined } : undefined} contentFit="cover" style={[styles.picture, { backgroundColor: theme.backgroundElement }]} />
       </Pressable>
-      {large && url && <Viewer url={url} name={item.file_name ?? ''} onClose={() => setLarge(false)} />}
+      {large && url && <Viewer url={url} cacheKey={item.storage_path ?? undefined} name={item.file_name ?? ''} onClose={() => setLarge(false)} />}
     </>
   );
 }
 
 /** The picture over the whole screen, inside the app. On iPhones two fingers make it larger. */
-function Viewer({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+function Viewer({ url, name, cacheKey, onClose }: { url: string; name: string; cacheKey?: string; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const screen = useWindowDimensions();
-  const picture = <Image source={{ uri: url }} contentFit="contain" style={{ width: '100%', height: '100%' }} />;
+  const picture = <Image source={{ uri: url, cacheKey }} contentFit="contain" style={{ width: '100%', height: '100%' }} />;
   return (
     <Overlay onClose={onClose}>
       <View style={[StyleSheet.absoluteFill, styles.viewer]}>
