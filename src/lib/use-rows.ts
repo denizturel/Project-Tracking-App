@@ -17,13 +17,14 @@ export function forgetRows() {
 export const keptChats = new Map<string, unknown>();
 
 /**
- * Loads a list from the database. `key` says when to load again (for example
- * the project id); call `reload` after saving something. A list that was
+ * Loads a list from the database. `key` names the list and says when to load again (for example
+ * `tasks1:${projectId}`); it must be different for every list in the app; call `reload` after saving something. A list that was
  * loaded before is shown straight away and then brought up to date quietly.
  */
 export function useRows<T>(key: string, load: () => Result<T>) {
-  // The same call in the code with the same key is the same list.
-  const memory = `${key}|${load.toString()}`;
+  // Each list gives its own key (a name for the place in the code plus what it depends on).
+  // The code of `load` cannot tell lists apart: on phones every function reads the same.
+  const memory = key;
   const [loaded, setLoaded] = useState<{ memory: string; rows: T[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);

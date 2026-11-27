@@ -61,7 +61,7 @@ export function Training({ info }: { info: SpaceInfo }) {
   const { subgroups } = useWorkspace();
   const [search, setSearch] = useState('');
 
-  const { rows, loading, error, reload } = useRows<Item>(info.project.id, () =>
+  const { rows, loading, error, reload } = useRows<Item>(`training1:${info.project.id}`, () =>
     supabase
       .from('training_items')
       .select(SELECT)

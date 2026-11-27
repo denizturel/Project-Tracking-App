@@ -507,7 +507,7 @@ type Colleague = { user_id: string; profile: { full_name: string; position: stri
  * A person who was not in the project joins it as staff at the same time.
  */
 function AddToPlace(props: { companyId: string; here: string[]; inProject: string[]; onAdd: (userId: string) => void }) {
-  const { rows, error, loading } = useRows<Colleague>(props.companyId, () =>
+  const { rows, error, loading } = useRows<Colleague>(`people1:${props.companyId}`, () =>
     supabase
       .from('company_members')
       .select('user_id, profile:profiles!user_id(full_name, position)')
@@ -547,7 +547,7 @@ function AddToPlace(props: { companyId: string; here: string[]; inProject: strin
 /** People who are already in the company space are added with one press, no code needed. */
 function AddFromCompany(props: { info: SpaceInfo; inProject: string[]; onAdd: (userId: string) => void }) {
   const { project } = props.info;
-  const { rows, error } = useRows<Colleague>(project.company_id, () =>
+  const { rows, error } = useRows<Colleague>(`people2:${project.company_id}`, () =>
     supabase
       .from('company_members')
       .select('user_id, profile:profiles!user_id(full_name, position)')
@@ -595,7 +595,7 @@ function InviteLink({ info }: { info: SpaceInfo }) {
   const projectId = info.project.id;
   const [failed, setFailed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const { rows, loading, error, reload } = useRows<ProjectLink>(projectId, () =>
+  const { rows, loading, error, reload } = useRows<ProjectLink>(`people3:${projectId}`, () =>
     supabase.from('project_links').select('token, enabled').eq('project_id', projectId).returns<ProjectLink[]>(),
   );
   const link = rows[0] ?? null;

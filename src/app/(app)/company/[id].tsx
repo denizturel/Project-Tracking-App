@@ -61,7 +61,7 @@ function CompanyPage({ company }: { company: CompanyNode }) {
   const [creating, setCreating] = useState(false);
   const [changing, setChanging] = useState<string | null>(null);
 
-  const { rows, error, reload } = useRows<CompanyPerson>(company.id, () =>
+  const { rows, error, reload } = useRows<CompanyPerson>(`company1:${company.id}`, () =>
     supabase
       .from('company_members')
       .select('user_id, role, profile:profiles!user_id(full_name, position, username)')
@@ -197,7 +197,7 @@ type Candidate = { user_id: string; username: string | null; full_name: string; 
  * Nobody joins by typing a name: the owner or a company admin presses Add.
  */
 function Waiting({ company, onAdded }: { company: CompanyNode; onAdded: () => void }) {
-  const { rows, reload } = useRows<Candidate>(company.id, () =>
+  const { rows, reload } = useRows<Candidate>(`company2:${company.id}`, () =>
     supabase.rpc('company_candidates', { company: company.id }) as unknown as PromiseLike<{ data: Candidate[] | null; error: { message: string } | null }>,
   );
   const [failed, setFailed] = useState<string | null>(null);

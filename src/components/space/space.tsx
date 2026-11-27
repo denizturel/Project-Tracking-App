@@ -148,13 +148,13 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
   const tree = subgroup ? [subgroup.id, ...children.map((c) => c.id)] : null;
   const within = (rows: OpenRow[]) => rows.filter((r) => !tree || tree.includes(r.subgroup_id ?? '')).length;
 
-  const openTasks = useRows<OpenRow>(project.id, () =>
+  const openTasks = useRows<OpenRow>(`space2:${project.id}`, () =>
     supabase.from('tasks').select('subgroup_id').eq('project_id', project.id).is('completed_at', null).returns<OpenRow[]>(),
   );
-  const openQuestions = useRows<OpenRow>(project.id, () =>
+  const openQuestions = useRows<OpenRow>(`space3:${project.id}`, () =>
     supabase.from('questions').select('subgroup_id').eq('project_id', project.id).neq('status', 'solved').returns<OpenRow[]>(),
   );
-  const people = useRows<{ user_id: string; subgroup_id?: string }>(`${project.id}:${subgroup?.id ?? ''}:${children.length}`, () =>
+  const people = useRows<{ user_id: string; subgroup_id?: string }>(`space1:${project.id}:${subgroup?.id ?? ''}:${children.length}`, () =>
     tree
       ? supabase.from('subgroup_members').select('user_id, subgroup_id').in('subgroup_id', tree).returns<{ user_id: string }[]>()
       : supabase.from('project_members').select('user_id').eq('project_id', project.id).returns<{ user_id: string }[]>(),

@@ -25,7 +25,7 @@ export default function ConnectionsScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   // Removing takes two presses, so a slip does nothing.
   const { profile, session } = useAuth();
-  const blocks = useRows<{ blocked: string; profile: { full_name: string } | null }>('blocks', () =>
+  const blocks = useRows<{ blocked: string; profile: { full_name: string } | null }>(`connections1:blocks`, () =>
     supabase
       .from('user_blocks')
       .select('blocked, profile:profiles!blocked(full_name)')

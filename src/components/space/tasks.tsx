@@ -74,7 +74,7 @@ export function Tasks({ info }: { info: SpaceInfo }) {
   const [adding, setAdding] = useState(false);
   const twoColumns = useWindowDimensions().width >= 1240 && !info.simple;
 
-  const { rows, loading, error, reload } = useRows<Task>(info.project.id, () =>
+  const { rows, loading, error, reload } = useRows<Task>(`tasks1:${info.project.id}`, () =>
     supabase
       .from('tasks')
       .select(SELECT)

@@ -25,7 +25,7 @@ export default function DirectChatScreen() {
   const other = chats.find((chat) => chat.conversation_id === id);
   const otherId = other?.user_id;
 
-  const blocks = useRows<{ blocked: string }>(otherId ?? '', () =>
+  const blocks = useRows<{ blocked: string }>(`chat1:${otherId ?? ''}`, () =>
     supabase.from('user_blocks').select('blocked').eq('blocked', otherId ?? me).returns<{ blocked: string }[]>(),
   );
   const blocked = !!otherId && blocks.rows.length > 0;

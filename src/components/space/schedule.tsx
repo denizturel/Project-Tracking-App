@@ -78,7 +78,7 @@ const BASE = 'id, subgroup_id, title, start_date, due_date, done, edited_at, edi
 
 /** Every milestone and meeting of the project; pages pick the ones for their own place. */
 export function useMilestones(projectId: string) {
-  return useRows<Milestone>(projectId, async () => {
+  return useRows<Milestone>(`schedule1:${projectId}`, async () => {
     const load = (columns: string) =>
       supabase
         .from('milestones')

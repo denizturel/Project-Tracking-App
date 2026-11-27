@@ -70,7 +70,7 @@ export function Questions({ info }: { info: SpaceInfo }) {
   const [asking, setAsking] = useState(false);
   const twoColumns = useWindowDimensions().width >= 1240 && !info.simple;
 
-  const { rows, loading, error, reload } = useRows<Question>(info.project.id, () =>
+  const { rows, loading, error, reload } = useRows<Question>(`questions1:${info.project.id}`, () =>
     supabase
       .from('questions')
       .select(SELECT)

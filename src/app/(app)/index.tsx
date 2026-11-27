@@ -36,10 +36,10 @@ export default function HomeScreen() {
   const adminOf = companies.filter((c) => c.role === 'owner' || c.role === 'admin');
   const key = projects.map((p) => p.id).join(',');
 
-  const milestones = useRows<MilestoneRow>(key, () =>
+  const milestones = useRows<MilestoneRow>(`index1:${key}`, () =>
     supabase.from('milestones').select('project_id, done').returns<MilestoneRow[]>(),
   );
-  const tasks = useRows<TaskRow>(key, () =>
+  const tasks = useRows<TaskRow>(`index2:${key}`, () =>
     supabase
       .from('tasks')
       .select('id, project_id, title, due_date')
@@ -49,7 +49,7 @@ export default function HomeScreen() {
       .limit(5)
       .returns<TaskRow[]>(),
   );
-  const solved = useRows<SolvedRow>(key, () =>
+  const solved = useRows<SolvedRow>(`index3:${key}`, () =>
     supabase
       .from('questions')
       .select('id, project_id, title')
@@ -58,7 +58,7 @@ export default function HomeScreen() {
       .limit(4)
       .returns<SolvedRow[]>(),
   );
-  const members = useRows<MemberRow>(key, () =>
+  const members = useRows<MemberRow>(`index4:${key}`, () =>
     supabase.from('project_members').select('project_id').returns<MemberRow[]>(),
   );
 

@@ -58,10 +58,10 @@ export function Overview({ info }: { info: SpaceInfo }) {
   const [view, setView] = useState<ScheduleView>('List');
 
   const key = project.id;
-  const tasks = useRows<TaskRow>(key, () =>
+  const tasks = useRows<TaskRow>(`overview3:${key}`, () =>
     supabase.from('tasks').select('id, subgroup_id, title, due_date, completed_at').eq('project_id', project.id).returns<TaskRow[]>(),
   );
-  const questions = useRows<QuestionRow>(key, () =>
+  const questions = useRows<QuestionRow>(`overview4:${key}`, () =>
     supabase
       .from('questions')
       .select('id, subgroup_id, title, status, created_at')
@@ -70,17 +70,17 @@ export function Overview({ info }: { info: SpaceInfo }) {
       .returns<QuestionRow[]>(),
   );
   const milestones = useMilestones(project.id);
-  const training = useRows<TrainingRow>(key, () =>
+  const training = useRows<TrainingRow>(`overview5:${key}`, () =>
     supabase.from('training_items').select('id, subgroup_id').eq('project_id', project.id).returns<TrainingRow[]>(),
   );
-  const members = useRows<PersonRow>(key, () =>
+  const members = useRows<PersonRow>(`overview6:${key}`, () =>
     supabase
       .from('project_members')
       .select('user_id, role, profile:profiles!user_id(full_name, position, company_name)')
       .eq('project_id', project.id)
       .returns<PersonRow[]>(),
   );
-  const placed = useRows<PersonRow>(`${key}:${subgroups.length}`, () =>
+  const placed = useRows<PersonRow>(`overview1:${key}:${subgroups.length}`, () =>
     supabase
       .from('subgroup_members')
       .select('user_id, subgroup_id, profile:profiles!user_id(full_name, position, company_name)')
@@ -436,14 +436,14 @@ export function Places({ info }: { info: SpaceInfo }) {
   const { project, subgroup, level } = info;
   const isAdmin = info.isFullAdmin;
   const ids = subgroups.filter((s) => s.project_id === project.id).map((s) => s.id);
-  const placed = useRows<PersonRow>(`${project.id}:${ids.length}`, () =>
+  const placed = useRows<PersonRow>(`overview2:${project.id}:${ids.length}`, () =>
     supabase
       .from('subgroup_members')
       .select('user_id, subgroup_id, profile:profiles!user_id(full_name, position, company_name)')
       .in('subgroup_id', ids)
       .returns<PersonRow[]>(),
   );
-  const questions = useRows<{ subgroup_id: string | null }>(project.id, () =>
+  const questions = useRows<{ subgroup_id: string | null }>(`overview7:${project.id}`, () =>
     supabase
       .from('questions')
       .select('subgroup_id')
