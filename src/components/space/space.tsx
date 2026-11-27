@@ -56,9 +56,9 @@ export function Space(props: { projectId: string } | { subgroupId: string }) {
   const router = useRouter();
   const wide = useWindowDimensions().width >= WIDE_SCREEN;
   // The open section is part of the address, so the side menu can link straight to it.
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; message?: string }>();
   const tab = typeof params.tab === 'string' && EVERY_TAB.includes(params.tab) ? params.tab : 'Overview';
-  const setTab = (next: string) => router.setParams({ tab: next, edit: undefined });
+  const setTab = (next: string) => router.setParams({ tab: next, edit: undefined, message: undefined });
 
   const subgroup = 'subgroupId' in props ? (subgroups.find((s) => s.id === props.subgroupId) ?? null) : null;
   const projectId = 'projectId' in props ? props.projectId : subgroup?.project_id;
@@ -136,6 +136,9 @@ type BodyProps = {
 };
 
 function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab, wide }: BodyProps) {
+  // A message opened from Search is shown and marked in the chat.
+  const asked = useLocalSearchParams<{ message?: string }>().message;
+  const focusMessage = typeof asked === 'string' ? asked : undefined;
   const theme = useTheme();
   const router = useRouter();
   const { subgroups } = useWorkspace();
@@ -255,7 +258,7 @@ function SpaceBody({ info, name, company, tabs, shownTab, inner, inChat, setTab,
       )}
 
       {inner === 'Chat' ? (
-        <Chat info={info} />
+        <Chat info={info} focus={focusMessage} />
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={[styles.column, WIDE_TABS.includes(inner) && wide && { maxWidth: WideContentWidth }]}>
@@ -281,7 +284,7 @@ function Crumb(props: { label: string; href?: React.ComponentProps<typeof Link>[
   return (
     <View style={styles.crumb}>
       {props.href && !props.last ? (
-        <Link href={props.href}>
+        <Link href={props.href} dismissTo={props.href === '/'}>
           <ThemedText type="smallBold" themeColor="primary">
             {props.label}
           </ThemedText>

@@ -1,0 +1,141 @@
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+
+import { ThemedText } from '@/components/themed-text';
+import { Button, Card, Chip, ErrorText, Field, Icon } from '@/components/ui';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { locale } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase';
+import { useWorkspace, WIDE_SCREEN } from '@/lib/workspace';
+
+type Hit = {
+  kind: 'message' | 'question' | 'solution' | 'task';
+  id: string;
+  project_id: string | null;
+  conversation_id: string | null;
+  snippet: string | null;
+  created_at: string;
+};
+
+const KIND_WORD: Record<Hit['kind'], string> = { message: 'Message', question: 'Question', solution: 'Solution', task: 'Task' };
+const when = (iso: string) => new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
+
+/** Searches every chat, question, solution and task you can see. Turkish letters do not matter ("sifre" finds "Şifre"). */
+export default function SearchScreen() {
+  const theme = useTheme();
+  const router = useRouter();
+  const wide = useWindowDimensions().width >= WIDE_SCREEN;
+  const { projects } = useWorkspace();
+  const [text, setText] = useState('');
+  const [hits, setHits] = useState<Hit[] | null>(null);
+  const [asked, setAsked] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function search() {
+    const q = text.trim();
+    if (q.length < 2) return;
+    setBusy(true);
+    const result = await supabase.rpc('search_all', { q });
+    setBusy(false);
+    setError(result.error?.message ?? null);
+    setHits((result.data as Hit[] | null) ?? []);
+    setAsked(q);
+  }
+
+  async function open(hit: Hit) {
+    if (hit.kind === 'message' && hit.conversation_id) {
+      const found = await supabase.from('conversations').select('kind, project_id, subgroup_id').eq('id', hit.conversation_id).maybeSingle();
+      const chat = found.data as { kind: string; project_id: string | null; subgroup_id: string | null } | null;
+      if (!chat) return setError('This chat could not be found.');
+      if (chat.kind === 'direct') router.push({ pathname: '/messages/[id]', params: { id: hit.conversation_id, message: hit.id } });
+      else if (chat.kind === 'subgroup' && chat.subgroup_id)
+        router.push({ pathname: '/group/[id]', params: { id: chat.subgroup_id, tab: 'Chat', message: hit.id } });
+      else if (chat.project_id) router.push({ pathname: '/project/[id]', params: { id: chat.project_id, tab: 'Chat', message: hit.id } });
+      return;
+    }
+    if (!hit.project_id) return;
+    router.push({ pathname: '/project/[id]', params: { id: hit.project_id, tab: hit.kind === 'task' ? 'Tasks' : 'Questions & solutions' } });
+  }
+
+  const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name ?? '';
+
+  return (
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <View style={styles.column}>
+        {wide && <ThemedText type="title">Search</ThemedText>}
+        <Card>
+          <Field
+            label="Search messages, questions, solutions and tasks"
+            value={text}
+            onChangeText={setText}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={search}
+          />
+          <Button title="Search" icon="search" onPress={search} loading={busy} disabled={text.trim().length < 2} />
+          <ErrorText>{error}</ErrorText>
+        </Card>
+
+        {busy && !hits && <ActivityIndicator color={theme.primary} size="large" />}
+        {hits && hits.length === 0 && (
+          <ThemedText themeColor="textSecondary" raw={false}>
+            Nothing found.
+          </ThemedText>
+        )}
+        {hits && hits.length > 0 && (
+          <Card style={{ gap: 0, paddingVertical: 4 }}>
+            {hits.map((hit, index) => (
+              <Pressable
+                key={`${hit.kind}-${hit.id}`}
+                accessibilityRole="button"
+                onPress={() => open(hit)}
+                style={({ pressed }) => [
+                  styles.row,
+                  index > 0 && { borderTopWidth: 1, borderTopColor: theme.border },
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}>
+                <View style={styles.grow}>
+                  <ThemedText raw numberOfLines={3}>
+                    {hit.snippet ?? ''}
+                  </ThemedText>
+                  <View style={styles.meta}>
+                    <Chip text={KIND_WORD[hit.kind]} tone={hit.kind === 'message' ? 'accent' : 'lavender'} />
+                    <ThemedText type="small" themeColor="textSecondary" raw numberOfLines={1} style={styles.grow}>
+                      {[projectName(hit.project_id), when(hit.created_at)].filter(Boolean).join(' · ')}
+                    </ThemedText>
+                  </View>
+                </View>
+                <ThemedText type="smallBold" themeColor="primary">
+                  {hit.kind === 'message' ? 'Go to message' : 'Go to it'}
+                </ThemedText>
+                <Icon name="chevron-right" size={18} color="textSecondary" />
+              </Pressable>
+            ))}
+          </Card>
+        )}
+        {hits && hits.length >= 100 && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Only the newest 100 results are shown. Add a word to narrow it down.
+          </ThemedText>
+        )}
+        {!hits && !busy && !asked && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Looks in every chat, question, solution and task you can see. Turkish letters do not matter.
+          </ThemedText>
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: { padding: Spacing.three, alignItems: 'center' },
+  column: { width: '100%', maxWidth: 760, gap: Spacing.three },
+  grow: { flex: 1, minWidth: 0 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: 6 },
+});

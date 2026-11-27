@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { NotificationsProvider, useNotifications } from '@/lib/notifications';
 import { WIDE_SCREEN, WorkspaceProvider } from '@/lib/workspace';
 
 /** The same project or group is the same page, whichever of its tabs is asked for. */
@@ -33,6 +34,7 @@ export default function AppLayout() {
 
   return (
     <WorkspaceProvider>
+      <NotificationsProvider>
       <View style={{ flex: 1, flexDirection: 'row', backgroundColor: theme.background }}>
         {wide && pinned && (
           <View style={{ width: 312, borderRightWidth: 1, borderRightColor: theme.border }}>
@@ -66,7 +68,7 @@ export default function AppLayout() {
                   <ThemedText type="heading" numberOfLines={1} style={styles.topBarTitle}>
                     {options.title}
                   </ThemedText>
-                  <View style={{ width: back ? 84 : 38 }} />
+                  <TopBarButtons />
                 </View>
               ),
             }}>
@@ -78,6 +80,8 @@ export default function AppLayout() {
             <Stack.Screen name="messages/index" options={{ title: 'Messages' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="messages/[id]" options={{ title: 'Messages' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="connections" options={{ title: 'Connections' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="notifications" options={{ title: 'Notifications' }} dangerouslySingular={onePerPage} />
+            <Stack.Screen name="search" options={{ title: 'Search' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="profile" options={{ title: 'Profile' }} dangerouslySingular={onePerPage} />
             <Stack.Screen name="settings" options={{ title: 'Settings' }} dangerouslySingular={onePerPage} />
           </Stack>
@@ -100,11 +104,37 @@ export default function AppLayout() {
           <Pressable accessibilityLabel="Close menu" style={styles.backdrop} onPress={() => setOpen(false)} />
         </View>
       )}
+      </NotificationsProvider>
     </WorkspaceProvider>
   );
 }
 
+/** Search and the notifications bell, on the right of the phone top bar. */
+function TopBarButtons() {
+  const router = useRouter();
+  const theme = useTheme();
+  const { unread } = useNotifications();
+  return (
+    <View style={styles.topBarButtons}>
+      <IconButton icon="search" label="Search" onPress={() => router.push('/search')} />
+      <View>
+        <IconButton icon="bell" label="Notifications" onPress={() => router.push('/notifications')} />
+        {unread > 0 && (
+          <View pointerEvents="none" style={[styles.bellCount, { backgroundColor: theme.danger }]}>
+            <ThemedText raw style={styles.bellCountText}>
+              {unread > 9 ? '9+' : unread}
+            </ThemedText>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  topBarButtons: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  bellCount: { position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  bellCountText: { color: '#fff', fontSize: 11, lineHeight: 14, fontWeight: '700' },
   menuHeader: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -16,7 +16,7 @@ import { WIDE_SCREEN } from '@/lib/workspace';
 
 /** A private chat between two people, with block and report behind the "more" button. */
 export default function DirectChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, message } = useLocalSearchParams<{ id: string; message?: string }>();
   const theme = useTheme();
   const { session } = useAuth();
   const me = session?.user.id ?? '';
@@ -144,7 +144,7 @@ export default function DirectChatScreen() {
         </View>
       )}
 
-      <Chat key={id} direct={id} closed={blocked ? 'You blocked this person. Unblock them to write again.' : undefined} />
+      <Chat key={id} direct={id} focus={typeof message === 'string' ? message : undefined} closed={blocked ? 'You blocked this person. Unblock them to write again.' : undefined} />
     </View>
   );
 }

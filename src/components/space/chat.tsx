@@ -11,9 +11,10 @@ import {
 
 import { type SpaceInfo } from '@/components/space/space';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar, Button, EditedLabel, ErrorText, TextButton, MoreMenu } from '@/components/ui';
+import { Avatar, Button, EditedLabel, ErrorText, IconButton, TextButton, MoreMenu } from '@/components/ui';
 import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { fold } from '@/lib/fold';
 import { locale, tr } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -32,7 +33,7 @@ type Message = {
 
 type Loaded = { conversationId: string | null; messages: Message[]; error: string | null; loadedAt: number };
 
-async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined): Promise<Loaded> {
+async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined, deep: boolean): Promise<Loaded> {
   const conversations = supabase.from('conversations').select('id');
   const found = await (direct
     ? conversations.eq('id', direct)
@@ -62,7 +63,8 @@ async function fetchChat(info: SpaceInfo | undefined, direct: string | undefined
     )
     .eq('conversation_id', found.data.id)
     .order('created_at', { ascending: false })
-    .limit(200);
+    // Looking for one older message (from Search) or searching in the chat reaches further back.
+    .limit(deep ? 1500 : 200);
 
   return {
     conversationId: found.data.id,
@@ -79,7 +81,7 @@ const time = (iso: string) =>
   new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Live chat of a project, group or team, or a private chat between two people (`direct`). */
-export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: string; closed?: string }) {
+export function Chat({ info, direct, closed, focus }: { info?: SpaceInfo; direct?: string; closed?: string; focus?: string }) {
   const theme = useTheme();
   const { session } = useAuth();
   const userId = session?.user.id;
@@ -94,12 +96,45 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The message to show and mark: the one opened from Search, or the current match of the search in this chat.
+  const [target, setTarget] = useState<string | null>(focus ?? null);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const deep = !!focus || searching;
+
   const refresh = () => setVersion((v) => v + 1);
   const conversationId = data?.conversationId ?? null;
 
+  // Another message was picked in Search while this chat was already open.
+  const [lastFocus, setLastFocus] = useState(focus);
+  if (focus !== lastFocus) {
+    setLastFocus(focus);
+    if (focus) setTarget(focus);
+  }
+
+  const wanted = fold(query.trim());
+  const matches =
+    searching && wanted.length >= 2
+      ? (data?.messages ?? []).filter((m) => !m.deleted_at && fold(m.body).includes(wanted)).map((m) => m.id)
+      : [];
+  const matchAt = target ? matches.indexOf(target) : -1;
+  const step = (by: number) => {
+    if (!matches.length) return;
+    const next = matchAt < 0 ? matches.length - 1 : (matchAt + by + matches.length) % matches.length;
+    setTarget(matches[next]);
+  };
+
+  // Brings the marked message into view.
+  const targetIndex = target && data ? data.messages.findIndex((m) => m.id === target) : -1;
+  useEffect(() => {
+    if (targetIndex < 0) return;
+    const timer = setTimeout(() => list.current?.scrollToIndex({ index: targetIndex, viewPosition: 0.4, animated: false }), 150);
+    return () => clearTimeout(timer);
+  }, [targetIndex, target]);
+
   useEffect(() => {
     let active = true;
-    fetchChat(info, direct).then((result) => {
+    fetchChat(info, direct, deep).then((result) => {
       if (!result.error) seen.set(memory, result);
       if (active) setData(result);
     });
@@ -108,7 +143,7 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
     };
     // The chat is identified by ids; `info` itself is a new object on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [info?.project.id, info?.subgroup?.id, direct, version]);
+  }, [info?.project.id, info?.subgroup?.id, direct, version, deep]);
 
   // New, edited and deleted messages from other people arrive live.
   useEffect(() => {
@@ -164,12 +199,60 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={100}>
+      <View style={[styles.searchBar, { borderBottomColor: theme.border, backgroundColor: theme.card }]}>
+        {searching ? (
+          <>
+            <TextInput
+              accessibilityLabel="Search in this chat"
+              placeholder={tr('Search in this chat')}
+              placeholderTextColor={theme.textSecondary}
+              value={query}
+              onChangeText={(value) => {
+                setQuery(value);
+                setTarget(null);
+              }}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => step(-1)}
+              style={[styles.searchInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.background }]}
+            />
+            <ThemedText type="small" themeColor="textSecondary" raw>
+              {wanted.length < 2 ? '' : matches.length ? `${matchAt < 0 ? matches.length : matchAt + 1}/${matches.length}` : '0'}
+            </ThemedText>
+            <IconButton icon="chevron-up" label="Previous match" onPress={() => step(-1)} disabled={!matches.length} />
+            <IconButton icon="chevron-down" label="Next match" onPress={() => step(1)} disabled={!matches.length} />
+            <IconButton
+              icon="x"
+              label="Close search"
+              onPress={() => {
+                setSearching(false);
+                setQuery('');
+                setTarget(null);
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <View style={styles.flex} />
+            <IconButton icon="search" label="Search in this chat" onPress={() => setSearching(true)} />
+          </>
+        )}
+      </View>
       <FlatList
         ref={list}
         data={data.messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.list}
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => {
+          if (!target) list.current?.scrollToEnd({ animated: false });
+        }}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          // Rows further up are not measured yet: go near it first, then exactly.
+          list.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+          setTimeout(() => list.current?.scrollToIndex({ index, viewPosition: 0.4, animated: false }), 250);
+        }}
         ListEmptyComponent={
           <ThemedText themeColor="textSecondary" style={{ textAlign: 'center' }}>
             No messages yet. Say hello.
@@ -191,6 +274,7 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
                   mine
                     ? { backgroundColor: theme.bubbleMe, borderColor: 'transparent' }
                     : { backgroundColor: theme.card, borderColor: theme.border },
+                  item.id === target && { borderColor: theme.primary, borderWidth: 3 },
                 ]}>
                 {!mine && (
                   <ThemedText type="smallBold" themeColor="primary">
@@ -277,6 +361,8 @@ export function Chat({ info, direct, closed }: { info?: SpaceInfo; direct?: stri
 }
 
 const styles = StyleSheet.create({
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.three, paddingVertical: 4, borderBottomWidth: 1, minHeight: 44 },
+  searchInput: { flex: 1, height: 38, borderWidth: 1, borderRadius: 19, paddingHorizontal: 14, fontSize: 16, fontFamily: Type.body },
   flex: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: {

@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { useDirectChats } from '@/lib/direct';
 import { jobText } from '@/lib/i18n';
+import { useNotifications } from '@/lib/notifications';
 import { useWorkspace } from '@/lib/workspace';
 
 const ICONS: Record<string, IconName> = {
@@ -43,6 +44,7 @@ export function Sidebar() {
   const params = useGlobalSearchParams<{ tab?: string }>();
   // Unread private messages; counted again when a chat is opened or left (new messages arrive by themselves).
   const { unread } = useDirectChats(pathname.startsWith('/messages') ? pathname : '');
+  const notifications = useNotifications();
 
   const toggle = (id: string) => setFolded((f) => ({ ...f, [id]: !f[id] }));
   const foldable = [
@@ -73,6 +75,8 @@ export function Sidebar() {
       <Row href="/" label="All projects" icon="grid" depth={0} active={pathname === '/'} home />
       <Row href="/messages" label="Messages" icon="message-circle" depth={0} active={pathname.startsWith('/messages')} badge={unread} />
       <Row href="/connections" label="Connections" icon="user-check" depth={0} active={pathname === '/connections'} />
+      <Row href="/notifications" label="Notifications" icon="bell" depth={0} active={pathname === '/notifications'} badge={notifications.unread} alert />
+      <Row href="/search" label="Search" icon="search" depth={0} active={pathname === '/search'} />
 
       <View style={styles.sectionHeader}>
         <ThemedText type="label">Projects</ThemedText>
@@ -284,6 +288,7 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
   const { companies, projects, subgroups } = useWorkspace();
   const pathname = usePathname();
   const { unread } = useDirectChats(pathname.startsWith('/messages') ? pathname : '');
+  const notifications = useNotifications();
   const openGroup = subgroups.find((s) => pathname === `/group/${s.id}`);
   const openParent = openGroup?.parent_id ?? openGroup?.id;
   const activeProject = openGroup?.project_id ?? projects.find((p) => pathname === `/project/${p.id}`)?.id;
@@ -315,6 +320,22 @@ export function MiniRail({ onOpen }: { onOpen: () => void }) {
         <Pressable accessibilityRole="link" accessibilityLabel="Connections">
           <View style={box(pathname === '/connections')}>
             <Icon name="user-check" size={22} color={pathname === '/connections' ? 'primary' : 'textSecondary'} />
+          </View>
+        </Pressable>
+      </Link>
+
+      <Link href="/notifications" asChild>
+        <Pressable accessibilityRole="link" accessibilityLabel="Notifications">
+          <View style={box(pathname === '/notifications')}>
+            <Icon name="bell" size={22} color={pathname === '/notifications' ? 'primary' : 'textSecondary'} />
+            {notifications.unread > 0 && <View style={[styles.dot, { backgroundColor: theme.danger }]} />}
+          </View>
+        </Pressable>
+      </Link>
+      <Link href="/search" asChild>
+        <Pressable accessibilityRole="link" accessibilityLabel="Search">
+          <View style={box(pathname === '/search')}>
+            <Icon name="search" size={22} color={pathname === '/search' ? 'primary' : 'textSecondary'} />
           </View>
         </Pressable>
       </Link>
@@ -392,9 +413,11 @@ type RowProps = {
   home?: boolean;
   /** A count shown at the end of the row, e.g. unread messages. */
   badge?: number;
+  /** The count is shown in red: something is waiting for you. */
+  alert?: boolean;
 };
 
-function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home, badge }: RowProps) {
+function Row({ href, label, depth, icon, bold, small, mark, active, folded, onToggle, home, badge, alert }: RowProps) {
   const theme = useTheme();
   const closeMenu = use(MenuClose);
 
@@ -414,8 +437,8 @@ function Row({ href, label, depth, icon, bold, small, mark, active, folded, onTo
               {label}
             </ThemedText>
             {!!badge && (
-              <View accessibilityLabel="Unread messages" style={[styles.badge, { backgroundColor: theme.primary }]}>
-                <ThemedText type="smallBold" raw style={{ color: theme.onPrimary, fontSize: 13, lineHeight: 18 }}>
+              <View accessibilityLabel="Unread" style={[styles.badge, { backgroundColor: alert ? theme.danger : theme.primary }]}>
+                <ThemedText type="smallBold" raw style={{ color: alert ? '#fff' : theme.onPrimary, fontSize: 13, lineHeight: 18 }}>
                   {badge}
                 </ThemedText>
               </View>
