@@ -102,18 +102,20 @@ function Screens({
         animation: 'none',
       }}
     >
-      <Stack.Protected guard={!signedIn}>
-        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={signedIn && !ready}>
-        <Stack.Screen name="work-details" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={ready}>
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
-      </Stack.Protected>
-      {/* Open to everyone, signed in or not. */}
+      {/* Open to everyone, signed in or not. Because these are always
+          available, every guarded screen below names where to go instead
+          (redirectTo); without it a signed-out visit to "/" lands on Terms. */}
       <Stack.Screen name="privacy" options={{ headerShown: false }} />
       <Stack.Screen name="terms" options={{ headerShown: false }} />
+      <Stack.Protected guard={!signedIn} redirectTo="/">
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={signedIn && !ready} redirectTo={signedIn ? '/' : '/sign-in'}>
+        <Stack.Screen name="work-details" options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={ready} redirectTo={signedIn ? '/work-details' : '/sign-in'}>
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      </Stack.Protected>
     </Stack>
   );
 }
